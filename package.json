@@ -7,8 +7,10 @@
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
-    "typechain": "hardhat typechain",
-    "test": "yarn hardhat test"
+    "format": "eslint . --fix",
+    "lint": "eslint . --max-warnings 0  && git ls-files '*.sh' | xargs shellcheck",
+    "test": "yarn hardhat test",
+    "typechain": "hardhat typechain"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -25,10 +27,20 @@
     "@types/chai": "^4.2.0",
     "@types/mocha": ">=9.1.0",
     "@types/node": ">=18.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
     "chai": "^4.2.0",
+    "eslint": "^9.21.0",
+    "eslint-config-prettier": "^10.0.2",
+    "eslint-plugin-prettier": "^5.2.3",
+    "eslint-plugin-unused-imports": "^4.1.4",
     "ethers": "^6.13.5",
     "hardhat": "^2.14.0",
     "hardhat-gas-reporter": "^1.0.8",
+    "husky": "^9.1.7",
+    "prettier": "^3.5.3",
+    "prettier-plugin-solidity": "^1.4.2",
+    "shellcheck": "^3.1.0",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.2",

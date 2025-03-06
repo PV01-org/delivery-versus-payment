@@ -1,0 +1,10 @@
+# Ignore artifacts:
+dist
+artifacts
+typechain
+
+# Ignore files
+**/*.html
+swagger.json
+README.md
+.github

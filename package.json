@@ -7,9 +7,10 @@
   "license": "MIT",
   "scripts": {
     "compile": "hardhat compile",
+    "coverage": "yarn hardhat coverage",
     "format": "eslint . --fix",
-    "lint": "eslint . --max-warnings 0  && git ls-files '*.sh' | xargs shellcheck",
     "test": "yarn hardhat test",
+    "test:gas": "REPORT_GAS=true yarn hardhat test",
     "typechain": "hardhat typechain"
   },
   "devDependencies": {
@@ -40,7 +41,6 @@
     "husky": "^9.1.7",
     "prettier": "^3.5.3",
     "prettier-plugin-solidity": "^1.4.2",
-    "shellcheck": "^3.1.0",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",
     "typechain": "^8.3.2",

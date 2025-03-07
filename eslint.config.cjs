@@ -6,14 +6,35 @@ const prettierPlugin = require('eslint-plugin-prettier');
 
 module.exports = [
   {
-    ignores: ['dist', 'artifacts', 'typechain', '*.html', 'swagger.json', 'README.md', '.github', 'eslint.config.cjs']
+    ignores: [
+      'dist',
+      'artifacts',
+      'typechain',
+      '*.html',
+      'swagger.json',
+      'README.md',
+      '.github',
+      'eslint.config.cjs',
+      'coverage/',
+      '.lcov-report/',
+      '.solcover.js'
+    ]
   },
   {
     files: ['**/*.ts', '**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      parser: tsParser
+      parser: tsParser,
+      globals: {
+        process: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        require: 'readonly',
+        module: 'writable',
+        console: 'readonly',
+        global: 'readonly'
+      }
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
@@ -37,33 +58,27 @@ module.exports = [
     }
   },
   {
-    // For your Mocha/Chai test files
     files: ['tests/**/*.ts', 'tests/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
       parser: tsParser,
-      // Manually list the Node + Mocha globals you need:
       globals: {
-        // Basic Node globals:
         global: 'readonly',
         process: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
         console: 'readonly',
-        // Mocha’s test functions:
         describe: 'readonly',
         it: 'readonly',
         before: 'readonly',
         beforeEach: 'readonly',
         after: 'readonly',
         afterEach: 'readonly',
-        // Any other you might need:
         setTimeout: 'readonly'
       }
     },
     rules: {
-      // Turn off some checks that conflict with typical test usage:
       'no-undef': 'off',
       'no-unused-expressions': 'off',
       '@typescript-eslint/no-unused-expressions': 'off'

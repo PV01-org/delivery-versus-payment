@@ -11,8 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@typechain/*": ["typechain/*"]
-    },
-    "typeRoots": ["./types"]
+    }
   },
   "include": ["./scripts", "tests", "./typechain"],
   "exclude": ["node_modules"],

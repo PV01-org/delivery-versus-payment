@@ -10,11 +10,13 @@ import { expect } from 'chai';
 import { ethers, network } from 'hardhat';
 import { DeliveryVersusPaymentV1__factory } from '../typechain/factories/contracts/dvp/V1/DeliveryVersusPaymentV1__factory';
 import {
+  AssetTokenThatReverts__factory,
   MaliciousActorDVP__factory,
   MaliciousTokenDVP__factory,
-  SanctionsList__factory,
-  AssetTokenThatReverts__factory
+  SanctionsList__factory
 } from '../typechain/factories/contracts/mock/';
+import { getAccounts } from './utils/accounts';
+import { CUSTOM_ERRORS } from './utils/customErrors';
 import {
   buildFlows,
   buildFlowsComplex,
@@ -26,8 +28,6 @@ import {
   getAndCheckPartyStatus,
   moveInTime
 } from './utils/deliveryVersusPaymentSetup';
-import { getAccounts } from './utils/accounts';
-import { CUSTOM_ERRORS } from './utils/customErrors';
 import { findEvent } from './utils/events';
 import { Timestamps } from './utils/timestamps';
 import { createNFT, createToken } from './utils/tokens';
@@ -47,10 +47,6 @@ const NFT_CAT_DAISY = 1;
 const NFT_CAT_BUTTONS = 2;
 const NFT_DOG_FIDO = 1;
 const NFT_DOG_TOBY = 2;
-const erc20TransferExceedsAllowance = 'ERC20: transfer amount exceeds allowance';
-const erc20TransferExceedsBalance = 'ERC20: transfer amount exceeds balance';
-const erc721OperatorQueryForNonexistentToken = 'ERC721: operator query for nonexistent token';
-const erc721TransferCallerNotOwnerNorApproved = 'ERC721: transfer caller is not owner nor approved';
 const revertWithReasonString = 'AssetTokenThatReverts: transferFrom is disabled';
 const _timestamps = new Timestamps();
 
@@ -833,7 +829,7 @@ describe(`DeliveryVersusPaymentV1 Network:${network.name}`, async () => {
     });
   });
 
-  describe.only('[Function] executeSettlement', async () => {
+  describe('[Function] executeSettlement', async () => {
     let settlementId: bigint;
     let settlementMixedId: bigint;
     beforeEach(async () => {
@@ -1075,8 +1071,9 @@ describe(`DeliveryVersusPaymentV1 Network:${network.name}`, async () => {
       // Remove allowance for Alice on the original settlement
       await _usdcToken.connect(_alice.wallet).approve(_dvpAddress, 0);
 
-      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementId)).to.be.revertedWith(
-        erc20TransferExceedsAllowance
+      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementId)).to.be.revertedWithCustomError(
+        _usdcToken,
+        CUSTOM_ERRORS.ERC20.ERC20InsufficientAllowance
       );
     });
 
@@ -1085,8 +1082,9 @@ describe(`DeliveryVersusPaymentV1 Network:${network.name}`, async () => {
       const aliceUsdcBalance = await _usdcToken.balanceOf(_alice.address);
       await _usdcToken.connect(_alice.wallet).transfer(_deployer.address, aliceUsdcBalance);
 
-      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementId)).to.be.revertedWith(
-        erc20TransferExceedsBalance
+      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementId)).to.be.revertedWithCustomError(
+        _usdcToken,
+        CUSTOM_ERRORS.ERC20.ERC20InsufficientBalance
       );
     });
 
@@ -1159,8 +1157,13 @@ describe(`DeliveryVersusPaymentV1 Network:${network.name}`, async () => {
       // Remove allowance for Alice's cat that was given to the DVP contract
       await _nftCatToken.connect(_alice.wallet).approve(ethers.ZeroAddress, NFT_CAT_DAISY);
 
-      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWith(
-        erc721TransferCallerNotOwnerNorApproved
+      // await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWith(
+      //   erc721TransferCallerNotOwnerNorApproved
+      // );
+
+      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWithCustomError(
+        _nftCatToken,
+        CUSTOM_ERRORS.ERC721.ERC721InsufficientApproval
       );
     });
 
@@ -1169,21 +1172,20 @@ describe(`DeliveryVersusPaymentV1 Network:${network.name}`, async () => {
       await _nftCatToken
         .connect(_alice.wallet)
         ['safeTransferFrom(address,address,uint256)'](_alice.address, _dave.address, NFT_CAT_DAISY);
-      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWith(
-        erc721TransferCallerNotOwnerNorApproved
+
+      await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWithCustomError(
+        _nftCatToken,
+        CUSTOM_ERRORS.ERC721.ERC721InsufficientApproval
       );
     });
 
-    it.only('[Case 15] Should revert if NFT id does not exist', async () => {
+    it('[Case 15] Should revert if NFT id does not exist', async () => {
       // An animal was hurt in the making of this test
       await _nftCatToken.connect(_alice.wallet).burn(NFT_CAT_DAISY);
       await expect(_dvp.connect(_alice.wallet).executeSettlement(settlementMixedId)).to.be.revertedWithCustomError(
         _nftCatToken,
-        'ERC721NonexistentToken'
-        //  CUSTOM_ERRORS.DeliveryVersusPayment.NoFlowsProvided
+        CUSTOM_ERRORS.ERC721.ERC721NonexistentToken
       );
-
-      //(erc721OperatorQueryForNonexistentToken);
     });
   });
 

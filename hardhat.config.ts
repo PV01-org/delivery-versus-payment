@@ -1,6 +1,9 @@
-import { HardhatUserConfig } from 'hardhat/config';
-import '@typechain/hardhat';
+import '@nomicfoundation/hardhat-ethers';
 import '@nomicfoundation/hardhat-toolbox';
+import '@typechain/hardhat';
+import 'hardhat-contract-sizer';
+import 'hardhat-deploy';
+import { HardhatUserConfig } from 'hardhat/config';
 
 interface HardhatUserConfigExtended extends HardhatUserConfig {
   typechain: {
@@ -35,6 +38,10 @@ const config: HardhatUserConfigExtended = {
   },
   paths: {
     tests: './tests'
+  },
+  namedAccounts: {
+    owner: 0,
+    user: 1
   },
   networks: {
     hardhat: {

@@ -19,7 +19,7 @@ jobs:
         run: yarn test
 
       - name: Run Linter
-        run: yarn lint
+        run: yarn format
 
   coverage:
     runs-on: ubuntu-latest

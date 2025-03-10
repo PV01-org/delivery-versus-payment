@@ -1,0 +1,55 @@
+@startuml dvp
+title Delivery Versus Payment with Auto-Settlement Sequence Diagram
+
+actor Alice
+actor Bob
+actor Charlie
+participant "DVP Contract" as DVP
+control Events
+participant "NFT\nContract" as NFT
+participant "USDC\nContract" as USDC
+actor Anyone
+
+'== Settlement Creation ==
+Anyone -> DVP: **[Tx]** Create Settlement
+activate DVP #C7D7F6
+note over DVP #WhiteSmoke
+Flows:
+• Alice → Bob: NFT id 1
+• Bob → Charlie: 0.5 ETH
+• Charlie → Alice: 500 USDC
+Settlement marked as "auto-settled"
+end note
+DVP --> NFT: Check claimed NFT addresses\nare really NFTs
+DVP --> DVP: Create settlement
+DVP --> Events: emit <font color="blue">**SettlementCreated**</font>
+deactivate DVP
+
+'== Approvals by Involved Parties ==
+Alice -> NFT: **[Tx]** Alice approves DVP contract can spend her NFT id 1
+Alice -> DVP: **[Tx]** Alice approves settlement. Note that ordering here is not strict, the\nrequirement is only that Alice approves before settlement execution.
+activate DVP #C7D7F6
+DVP --> Events: emit <font color="blue">**SettlementApproved**</font>
+deactivate DVP
+Bob -> DVP: **[Tx]** Bob approves settlement, sending 0.5 ETH with the\ntransaction, which the DVP contract keeps in escrow
+activate DVP #C7D7F6
+DVP --> Events: emit <font color="blue">**SettlementApproved**</font>
+deactivate DVP
+Charlie -> USDC: **[Tx]** Charlie approves DVP contract can spend his USDC. Again, ordering is not strict so long as this\nis done before settlement execution.
+Charlie -> DVP: **[Tx]** Charlie approves settlement
+
+'== Execution of Settlement ==
+activate DVP #C7D7F6
+DVP --> Events: emit <font color="blue">**SettlementApproved**</font>
+note over DVP #WhiteSmoke
+Charlie is final approver and settlement is auto-settled
+so execution happens automatically, within same transaction.
+end note
+Anyone --[#LightGrey]> DVP: [Not part of this process, but if settlement were not\nauto-settled, then anyone could execute it here]
+DVP --> Alice: Alice gets 500 USDC (DVP initiates transfer from Charlie)
+DVP --> Bob: Bob gets Alice's NFT id 1 (DVP initiates transfer from Alice)
+DVP --> Charlie: Charlie gets the 0.5 ETH from contract escrow
+DVP --> Events: emit <font color="blue">**SettlementExecuted**</font>
+deactivate DVP
+
+@enduml

@@ -36,6 +36,8 @@ The DVP contracts are available at the following addresses:
 
 ## Usage
 
+![flow](docs/dvp-transaction-flow.png)
+
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.

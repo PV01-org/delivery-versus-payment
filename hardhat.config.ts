@@ -39,6 +39,9 @@ const config: HardhatUserConfigExtended = {
   paths: {
     tests: './tests'
   },
+  contractSizer: {
+    only: ['^contracts/dvp/']
+  },
   namedAccounts: {
     owner: 0,
     user: 1

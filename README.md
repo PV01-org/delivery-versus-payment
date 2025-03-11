@@ -1,39 +1,38 @@
-# Delivery Versus Payment
+# Delivery Versus Payment <!-- omit from toc -->
 
 ![Build Status](https://github.com/PV01-org/delivery-versus-payment/actions/workflows/ci.yml/badge.svg)
 ![GitHub issues](https://img.shields.io/github/issues/PV01-org/delivery-versus-payment)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/PV01-org/delivery-versus-payment)
 
-- [Delivery Versus Payment](#delivery-versus-payment)
-  - [Description](#description)
-    - [Features:](#features)
-    - [Terminology:](#terminology)
-  - [Installation](#installation)
-  - [Commands](#commands)
-  - [Deployed Addresses](#deployed-addresses)
-  - [Workflow Summary](#workflow-summary)
-    - [Create a Settlement](#create-a-settlement)
-    - [Approve a Settlement](#approve-a-settlement)
-    - [Execute a Settlement](#execute-a-settlement)
-    - [Changes](#changes)
-    - [Gas Usage](#gas-usage)
-    - [Griefing](#griefing)
-  - [Sequence Diagram](#sequence-diagram)
-  - [Contributing](#contributing)
-  - [Roadmap](#roadmap)
-  - [License](#license)
+- [Description](#description)
+  - [Features](#features)
+  - [Terminology](#terminology)
+- [Installation](#installation)
+- [Commands](#commands)
+- [Deployed Addresses](#deployed-addresses)
+- [Workflow Summary](#workflow-summary)
+  - [Create a Settlement](#create-a-settlement)
+  - [Approve a Settlement](#approve-a-settlement)
+  - [Execute a Settlement](#execute-a-settlement)
+  - [Changes](#changes)
+  - [Gas Usage](#gas-usage)
+  - [Griefing](#griefing)
+- [Sequence Diagram](#sequence-diagram)
+- [Contributing](#contributing)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ## Description
-This repo is a permissionless implementation of the Delivery Versus Payment (DvP) protocol supporting ERC-20, ERC-721, and Ether transfers. Developed and actively used by [PV01](https://pv0.one), this project is open-sourced under the MIT [license](LICENSE) and provided as a public good.
+This repo is a permissionless implementation of the Delivery Versus Payment (DVP) protocol supporting ERC-20, ERC-721, and Ether transfers. Developed and actively used by [PV01](https://pv0.one), this project is open-sourced under the MIT [license](LICENSE) and provided as a public good.
 
-### Features:
+### Features
  - Non-upgradeable, singleton [Delivery Versus Payment contract](contracts/dvp/V1/DeliveryVersusPaymentV1.sol).
  - Allows atomic swaps of an arbitrary number of assets between an arbitrary number of parties.
  - Permissionless, anyone can create and execute these swaps, so long as involved parties have approved.
  - Supports assets including native ETH, ERC-20 and ERC-721.
  - [Helper contract](contracts/dvp/V1/DeliveryVersusPaymentV1HelperV1.sol) provides search functionality for off-chain use.
 
-### Terminology:
+### Terminology
  - Party: An address involved as either a `from` or `to` in an asset movement.
  - Flow: A movement of a single asset between two parties.
  - Asset: Ether, ERC-20 or ERC-721 token.

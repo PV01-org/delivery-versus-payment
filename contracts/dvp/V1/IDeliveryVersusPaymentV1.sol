@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-/// @dev Interface sufficient for DVP Helper contract to interact with a DVP contract
+/**
+ * @dev Interface sufficient for DVP Helper contract to interact with a DVP contract
+ * Created by https://pv0.one.
+ *
+ */
 interface IDeliveryVersusPaymentV1 {
   /// @dev A Flow is a single transfer from one address to another
   struct Flow {

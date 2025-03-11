@@ -6,6 +6,7 @@ import "./IDeliveryVersusPaymentV1.sol";
 /**
  * @title DeliveryVersusPaymentV1HelperV1
  * @dev Provides view helper functions to page through settlements using a cursor-based approach.
+ * Created by https://pv0.one.
  * It allows filtering by token address, by involved party, or by token type (Ether, ERC20, or NFT).
  * Each function accepts a DVP contract, a starting cursor and a pageSize and returns matching settlement
  * IDs along with a nextCursor (which is the settlement ID to use as the starting cursor in the next call).

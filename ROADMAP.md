@@ -8,4 +8,6 @@
 
 ## DVP Version 2
 - Gas optimizations and performance improvements.
-- A V2 could include support for arbitrary protocols (for example ERC-1155), but allow these to be added in a permissionless way, without needing contract redeploy or upgrades.
+- Could add PERMIT2 support to make UX for token approvals simpler.
+- Could "net off" all flows so the only actual token transfers are only the minimum at the end.
+- Could include support for arbitrary protocols (for example ERC-1155), but allow these to be added in a permissionless way, without needing contract redeploy or upgrades.

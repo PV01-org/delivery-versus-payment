@@ -100,6 +100,20 @@ It is acknowledged that bad actors could be annoying by creating flows with fake
 Sequence diagram for a happy path process though a settlement with auto-settle enabled.
 ![flow](docs/dvp-transaction-flow.png)
 
+## Events
+Topic0 values for events are:
+| Event                                  | topic0                                                             |
+|----------------------------------------|--------------------------------------------------------------------|
+| ETHReceived                            | 0xbfe611b001dfcd411432f7bf0d79b82b4b2ee81511edac123a3403c357fb972a |
+| ETHWithdrawn                           | 0x94b2de810873337ed265c5f8cf98c9cffefa06b8607f9a2f1fbaebdfbcfbef1c |
+| SettlementApprovalRevoked              | 0x96c5a579760c144ad93a5c19d41440d5185ba0451704c0ac7cb22488d8735ac2 |
+| SettlementApproved                     | 0x7f89b61c53062fb158619c7b66552eabdfb0e1d37c439a62c2d2b5a657bcea93 |
+| SettlementAutoExecutionFailedOther     | 0x63c222ac809d589e48426985c6af11739f936b405e0a78a920fbae6565c07497 |
+| SettlementAutoExecutionFailedPanic     | 0x3ad9899b9bd85d1d9b8ab792041d08fe646b2d286885240f5baa3cbc1d721270 |
+| SettlementAutoExecutionFailedReason    | 0xe1c01819733d746479549271d3a51445514b8f678614d50ad34d305c67b83d9c |
+| SettlementCreated                      | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
+| SettlementExecuted                     | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
+
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 

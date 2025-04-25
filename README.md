@@ -58,12 +58,12 @@ The following CLI commands are available:
 
 ## Deployed Addresses
 The DVP contracts are available at the following addresses. Since the solution is permissionless, they can be freely used as they are, without needing further contract deployments:
-| Chain       | Instance    | Contract                         | Address                                      |
+| Chain       | Instance    | Contract Etherscan Link          | Address                                      |
 |-------------|-------------|----------------------------------|----------------------------------------------|
 | Ethereum    | Mainnet     | DeliveryVersusPaymentV1          | `tbc`                                        |
 | Ethereum    | Mainnet     | DeliveryVersusPaymentV1HelperV1  | `tbc`                                        |
-| Ethereum    | Sepolia     | DeliveryVersusPaymentV1          | `0x41F4330fe57b7B9DE77Afe9f4169BCBFFa1d9015` |
-| Ethereum    | Sepolia     | DeliveryVersusPaymentV1HelperV1  | `0xf1173c7b079371762eEaeeafA47b9b8B53a50138` |
+| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1](https://sepolia.etherscan.io/address/0x41F4330fe57b7B9DE77Afe9f4169BCBFFa1d9015)          | `0x41F4330fe57b7B9DE77Afe9f4169BCBFFa1d9015` |
+| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1HelperV1](https://sepolia.etherscan.io/address/0xf1173c7b079371762eEaeeafA47b9b8B53a50138)  | `0xf1173c7b079371762eEaeeafA47b9b8B53a50138` |
 
 ## Workflow Summary
 ### Create a Settlement

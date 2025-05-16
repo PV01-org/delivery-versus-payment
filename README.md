@@ -3,6 +3,7 @@
 ![Build Status](https://github.com/PV01-org/delivery-versus-payment/actions/workflows/ci.yml/badge.svg)
 ![GitHub issues](https://img.shields.io/github/issues/PV01-org/delivery-versus-payment)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/PV01-org/delivery-versus-payment)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/PV01-org/delivery-versus-payment)
 
 - [Description](#description)
   - [Features](#features)

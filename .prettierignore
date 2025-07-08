@@ -1,7 +1,7 @@
 # Ignore artifacts:
-dist
-artifacts
-typechain
+lib/
+out/
+docs/
 
 # Ignore files
 **/*.html

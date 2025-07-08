@@ -18,7 +18,9 @@
   - [Changes](#changes)
   - [Gas Usage](#gas-usage)
   - [Griefing](#griefing)
+  - [Reentrancy Protection](#reentrancy-protection)
 - [Sequence Diagram](#sequence-diagram)
+- [Events](#events)
 - [Contributing](#contributing)
 - [Roadmap](#roadmap)
 - [License](#license)
@@ -40,22 +42,21 @@ This repo is a permissionless implementation of the Delivery Versus Payment (DVP
  - Settlement: A collection of an arbitrary number of flows, uniquely identified by a Settlement id. All settlements live in the singleton contract.
 
 ## Installation
-Clone this repo, then:
-```sh
-yarn install
+```
+git clone --recurse-submodules https://github.com/PV01-org/delivery-versus-payment.git
+cd delivery-versus-payment
+forge build
 ```
 
 ## Commands
 The following CLI commands are available:
-| # | Action          | Usage                            | Description                               |
-|---|-----------------|----------------------------------|-------------------------------------------|
-| 1 | Compile         | `yarn compile`                   | Compile Solidity smart contracts.         |
-| 2 | Typechain       | `yarn typechain`                 | Generate TypeScript typings for contracts.|
-| 3 | Test            | `yarn test`                      | Run smart contract tests.                 |
-| 4 | Coverage        | `yarn coverage`                  | Run tests and generate coverage reports.  |
-| 5 | Gas Estimate    | `yarn test:gas`                  | Run tests with detailed gas reporting.    |
-| 6 | Sizer           | `yarn size`                      | Report contract sizes in bytes.           |
-| 7 | Format          | `yarn format`                    | Auto-formats codebase.                    |
+| # | Action         | Usage                       | Description                               |
+|---|----------------|-----------------------------|-------------------------------------------|
+| 1 | Compile        | `forge build`               | Compile Solidity smart contracts.         |
+| 2 | Test           | `forge test --summary`      | Run smart contract tests.                 |
+| 3 | Coverage       | `forge coverage`            | Run tests and generate coverage reports.  |
+| 4 | Gas Estimate   | `forge test --gas-report`   | Run tests with gas reporting.             |
+| 5 | Sizer          | `forge build --sizes`       | Report contract size.                     |
 
 ## Deployed Addresses
 The DVP contracts are available at the following addresses. Since the solution is permissionless, they can be freely used as they are, without needing further contract deployments:
@@ -63,8 +64,14 @@ The DVP contracts are available at the following addresses. Since the solution i
 |-------------|-------------|----------------------------------|----------------------------------------------|
 | Ethereum    | Mainnet     | DeliveryVersusPaymentV1          | `tbc`                                        |
 | Ethereum    | Mainnet     | DeliveryVersusPaymentV1HelperV1  | `tbc`                                        |
-| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1](https://sepolia.etherscan.io/address/0x41F4330fe57b7B9DE77Afe9f4169BCBFFa1d9015)          | `0x41F4330fe57b7B9DE77Afe9f4169BCBFFa1d9015` |
-| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1HelperV1](https://sepolia.etherscan.io/address/0xf1173c7b079371762eEaeeafA47b9b8B53a50138)  | `0xf1173c7b079371762eEaeeafA47b9b8B53a50138` |
+| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1](https://sepolia.etherscan.io/address/0xa725759CA0a2c18E59495dE1029b84261cD29B3f)          | `0xa725759CA0a2c18E59495dE1029b84261cD29B3f` |
+| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1HelperV1](https://sepolia.etherscan.io/address/0x0C5c8941B6A07626713aD42e561BFBbC6636f82A)  | `0x0C5c8941B6A07626713aD42e561BFBbC6636f82A` |
+
+To deploy further copies, use the deploy scripts in the `./script` folder, for example:
+
+```bash
+forge script script/DeployDvp.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+```
 
 ## Workflow Summary
 ### Create a Settlement
@@ -97,6 +104,19 @@ There are many unbounded loops in this contract, by design. There is no limit on
 ### Griefing
 It is acknowledged that bad actors could be annoying by creating flows with fake tokens, or flows with tokens that would intentionally revert when the settlement is executed, and so making a settlement impossible to process. These bad actors could potentially trick other parties into locking ETH into a settlement that could never be processed. There is no financial loss (gas fees excepted) because when other parties discover the ruse, they can withdraw their approval and withdraw their ETH.
 
+### Reentrancy Protection
+Settlement approval can be done in batches. Settlement execution can potentially be triggered inside that (if auto-settle is switched on and a party is giving the final approval). Settlement execution can make many external calls to process transfers of assets. These patterns lend themselves well to reentrancy, which is protected against as follows:
+
+| Function             | Reentrancy Protection     | 
+|----------------------|---------------------------|
+| approveSettlements() | OZ nonReentrant modifer   |
+| createSettlement()   | No external calls made    |
+| executeSettlement()  | OZ nonReentrant modifer   |
+| revokeApprovals()    | OZ nonReentrant modifer   |
+| withdrawETH()        | OZ nonReentrant modifer   |
+
+There are some subtleties inside the protection for `approveSettlements()` and `executeSettlement()`, explained [here](REENTRANCY.md).
+
 ## Sequence Diagram
 Sequence diagram for a happy path process though a settlement with auto-settle enabled.
 ![flow](docs/dvp-transaction-flow.png)
@@ -123,4 +143,3 @@ See [ROADMAP.md](ROADMAP.md) for more details.
 
 ## License
 This project is licensed under the terms of the [LICENSE](LICENSE).
-

@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+/**
+██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
+██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
+██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
+██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
+██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
+╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
+ */
+
 import {Address} from "@openzeppelin/contracts-v5-2-0/utils/Address.sol";
 import {ERC165Checker} from "@openzeppelin/contracts-v5-2-0/utils/introspection/ERC165Checker.sol";
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
 import {IERC20} from "@openzeppelin/contracts-v5-2-0/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts-v5-2-0/token/ERC721/IERC721.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts-v5-2-0/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts-v5-2-0/utils/ReentrancyGuardTransient.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v5-2-0/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title DeliveryVersusPaymentV1
  * @dev Delivery Versus Payment implementation for ERC-20, ERC-721 and Ether transfers.
- * Created by https://pv0.one.
+ * Created by https://pv0.one. Implemented at https://dvpeasy.xyz.
  *
  * Workflow Summary:
  *
@@ -56,7 +65,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v5-2-0/token/ERC20/utils/SafeER
  * chain's block gas limit acts as a cap. In every case it is the caller's responsibility to ensure that the gas requirement
  * can be met.
  */
-contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
+contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTransient {
   using SafeERC20 for IERC20;
   using ERC165Checker for address;
 
@@ -74,7 +83,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   error ApprovalAlreadyGranted();
   error ApprovalNotGranted();
   error CallerNotInvolved();
+  error CallerMustBeDvpContract();
   error CannotSendEtherDirectly();
+  error CutoffDateNotPassed();
   error CutoffDatePassed();
   error IncorrectETHAmount();
   error InvalidERC20Token();
@@ -118,92 +129,12 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   /// @dev Last settlement id used
   uint256 public settlementIdCounter;
 
-  /// @dev used during auto-settlement to infer the approver
-  address transient _approverAddress;
+  /// @dev selector for decimals() function in ERC-20 tokens
+  bytes4 private constant SELECTOR_ERC20_DECIMALS = bytes4(keccak256("decimals()"));
 
   //------------------------------------------------------------------------------
   // Public
   //------------------------------------------------------------------------------
-  /**
-   * @dev Executes the settlement if all approvals are in place.
-   * @param settlementId The id of the settlement to execute.
-   */
-  function executeSettlement(uint256 settlementId) public nonReentrant {
-    Settlement storage settlement = settlements[settlementId];
-    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
-    if (settlement.isSettled) revert SettlementAlreadyExecuted();
-    if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
-
-    uint256 length = settlement.flows.length;
-    for (uint256 i = 0; i < length; i++) {
-      Flow storage flow = settlement.flows[i];
-      if (flow.token == address(0)) {
-        // ETH Transfer
-        // Note: settlement.ethDeposits[flow.from] must == flow.amount, otherwise approval would not have been
-        // possible and isSettlementApproved() would have failed. So no need to check for insufficient balance.
-        uint256 amount = flow.amountOrId;
-        settlement.ethDeposits[flow.from] -= amount;
-        // sendValue reverts if unsuccessful
-        Address.sendValue(payable(flow.to), amount);
-      } else {
-        // ERC-721 or ERC-20 transfer in the same way (must cast to IERC20 for OZ safeTransfer for ERC-20)
-        IERC20 eitherToken = IERC20(flow.token);
-        // safeTransfer reverts if unsuccessful for ERC-20 and ERC-721
-        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
-      }
-    }
-
-    settlement.isSettled = true;
-    // work out the executor address (during auto-settle, msg.sender is self)
-    address executor = msg.sender == address(this) ? _approverAddress : msg.sender;
-    emit SettlementExecuted(settlementId, executor);
-  }
-
-  /**
-   * @dev Retrieves settlement details.
-   * @param settlementId The id of the settlement to retrieve.
-   */
-  function getSettlement(
-    uint256 settlementId
-  )
-    public
-    view
-    returns (
-      string memory settlementReference,
-      uint256 cutoffDate,
-      Flow[] memory flows,
-      bool isSettled,
-      bool isAutoSettled
-    )
-  {
-    Settlement storage settlement = settlements[settlementId];
-    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    return (
-      settlement.settlementReference,
-      settlement.cutoffDate,
-      settlement.flows,
-      settlement.isSettled,
-      settlement.isAutoSettled
-    );
-  }
-
-  /**
-   * @dev Helper for clients to check if a token ERC-721.
-   * @param token The address of the token to check.
-   */
-  function isERC721(address token) public view returns (bool) {
-    return _isERC721(token);
-  }
-
-  /**
-   * @dev Helper for clients to check if a token is potentially ERC-20.
-   * @param token The address of the token to check.
-   */
-  function isERC20(address token) public view returns (bool) {
-    return _isERC20(token);
-  }
-
   /**
    * @dev Checks if all parties have approved the settlement.
    * @param settlementId The id of the settlement to check.
@@ -226,45 +157,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   // External
   //------------------------------------------------------------------------------
   /**
-   * @dev Creates a new settlement with the specified flows and cutoff date.
-   * Reverts if cutoff date is in the past, no flows are provided, or a claimed NFT token is not
-   * and NFT. There is intentionally no limit on the number of flows, the current chain's block
-   * gas limit acts as a cap for the max flows.
-   * @param flows The flows to include in the settlement.
-   * @param settlementReference A free text reference for the settlement.
-   * @param cutoffDate The deadline for approvals and execution.
-   * @param isAutoSettled If true, the settlement will be executed automatically after all approvals are in place.
-   */
-  function createSettlement(
-    Flow[] calldata flows,
-    string calldata settlementReference,
-    uint256 cutoffDate,
-    bool isAutoSettled
-  ) external returns (uint256) {
-    if (cutoffDate <= block.timestamp) revert CutoffDatePassed();
-    if (flows.length == 0) revert NoFlowsProvided();
-
-    settlementIdCounter++;
-    Settlement storage settlement = settlements[settlementIdCounter];
-    settlement.settlementReference = settlementReference;
-    settlement.cutoffDate = cutoffDate;
-    settlement.isAutoSettled = isAutoSettled;
-
-    for (uint256 i = 0; i < flows.length; i++) {
-      Flow calldata flow = flows[i];
-      if (flow.isNFT) {
-        if (!_isERC721(flow.token)) revert InvalidERC721Token();
-      } else if (flow.token != address(0)) {
-        if (!_isERC20(flow.token)) revert InvalidERC20Token();
-      }
-      settlement.flows.push(flow);
-    }
-
-    emit SettlementCreated(settlementIdCounter, msg.sender);
-    return settlementIdCounter;
-  }
-
-  /**
    * @dev Approves multiple settlements and sends exact required ETH deposits. To find out how much ETH to send with
    * an approval, call function getSettlementPartyStatus() first. If a settlement is marked as auto-settled,
    * and this is the final approval, then the settlement will also be executed.
@@ -275,8 +167,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
    * the settlement can be executed later.
    * @param settlementIds The ids of the settlements to approve.
    */
-  function approveSettlements(uint256[] calldata settlementIds) external payable {
-    _approverAddress = msg.sender;
+  function approveSettlements(uint256[] calldata settlementIds) external payable nonReentrant {
     uint256 totalEthRequired;
 
     for (uint256 i = 0; i < settlementIds.length; i++) {
@@ -285,11 +176,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
 
       if (settlement.flows.length == 0) revert SettlementDoesNotExist();
       if (settlement.isSettled) revert SettlementAlreadyExecuted();
-      if (settlement.cutoffDate <= block.timestamp) revert CutoffDatePassed();
+      if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
       if (settlement.approvals[msg.sender]) revert ApprovalAlreadyGranted();
 
-      uint256 ethAmountRequired;
-      bool isInvolved;
+      uint256 ethAmountRequired = 0;
+      bool isInvolved = false;
 
       uint256 length = settlement.flows.length;
       for (uint256 j = 0; j < length; j++) {
@@ -323,9 +214,10 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
       uint256 settlementId = settlementIds[i];
       Settlement storage settlement = settlements[settlementId];
       if (settlement.isAutoSettled && isSettlementApproved(settlementId)) {
-        // Failed auto-execution will not revert the entire transaction, just that settlement's execution (and
-        // the earlier approval will remain)
-        try this.executeSettlement(settlementId) {
+        // Failed auto-execution will not revert the entire transaction, only that settlement's execution will fail.
+        // Other settlements will still be processed, and the earlier approval will remain. Note that try{} only
+        // supports external/public calls.
+        try this.executeSettlementInner(msg.sender, settlementId) {
           // Success
         } catch Error(string memory reason) {
           // Revert with reason string
@@ -339,6 +231,120 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
         }
       }
     }
+  }
+
+  /**
+   * @dev Creates a new settlement with the specified flows and cutoff date.
+   * Reverts if cutoff date is in the past, no flows are provided, or a claimed NFT token is not
+   * and NFT. There is intentionally no limit on the number of flows, the current chain's block
+   * gas limit acts as a cap for the max flows.
+   * @param flows The flows to include in the settlement.
+   * @param settlementReference A free text reference for the settlement.
+   * @param cutoffDate The deadline for approvals and execution.
+   * @param isAutoSettled If true, the settlement will be executed automatically after all approvals are in place.
+   */
+  function createSettlement(
+    Flow[] calldata flows,
+    string calldata settlementReference,
+    uint256 cutoffDate,
+    bool isAutoSettled
+  ) external returns (uint256) {
+    if (block.timestamp > cutoffDate) revert CutoffDatePassed();
+    if (flows.length == 0) revert NoFlowsProvided();
+
+    settlementIdCounter++;
+    Settlement storage settlement = settlements[settlementIdCounter];
+    settlement.settlementReference = settlementReference;
+    settlement.cutoffDate = cutoffDate;
+    settlement.isAutoSettled = isAutoSettled;
+
+    for (uint256 i = 0; i < flows.length; i++) {
+      Flow calldata flow = flows[i];
+      if (flow.isNFT) {
+        if (!_isERC721(flow.token)) revert InvalidERC721Token();
+      } else if (flow.token != address(0)) {
+        if (!_isERC20(flow.token)) revert InvalidERC20Token();
+      }
+      settlement.flows.push(flow);
+    }
+
+    emit SettlementCreated(settlementIdCounter, msg.sender);
+    return settlementIdCounter;
+  }
+
+  /**
+   * @dev Executes the settlement if all approvals are in place.
+   * @param settlementId The id of the settlement to execute.
+   */
+  function executeSettlement(uint256 settlementId) external nonReentrant {
+    this.executeSettlementInner(msg.sender, settlementId);
+  }
+
+  /**
+   * @dev Execute a single settlement. This is an external function, so that it can be used
+   * inside a try/catch, but it behaves like an internal function, in that the caller must
+   * be the self contract or the call with revert.
+   */
+  function executeSettlementInner(address originalCaller, uint256 settlementId) external {
+    // this function can only be called by the DVP contract itself
+    if (msg.sender != address(this)) {
+      revert CallerMustBeDvpContract();
+    }
+    Settlement storage settlement = settlements[settlementId];
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
+    if (settlement.isSettled) revert SettlementAlreadyExecuted();
+    if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
+
+    uint256 length = settlement.flows.length;
+    for (uint256 i = 0; i < length; i++) {
+      Flow storage flow = settlement.flows[i];
+      if (flow.token == address(0)) {
+        // ETH Transfer
+        // Note: settlement.ethDeposits[flow.from] must == flow.amount, otherwise approval would not have been
+        // possible and isSettlementApproved() would have failed. So no need to check for insufficient balance.
+        uint256 amount = flow.amountOrId;
+        settlement.ethDeposits[flow.from] -= amount;
+        // sendValue reverts if unsuccessful
+        Address.sendValue(payable(flow.to), amount);
+      } else {
+        // ERC-721 or ERC-20 transfer in the same way (must cast to IERC20 for OZ safeTransfer for ERC-20)
+        IERC20 eitherToken = IERC20(flow.token);
+        // safeTransfer reverts if unsuccessful for ERC-20 and ERC-721
+        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
+      }
+    }
+
+    settlement.isSettled = true;
+    emit SettlementExecuted(settlementId, originalCaller);
+  }
+
+  /**
+   * @dev Retrieves settlement details.
+   * @param settlementId The id of the settlement to retrieve.
+   */
+  function getSettlement(
+    uint256 settlementId
+  )
+    external
+    view
+    returns (
+      string memory settlementReference,
+      uint256 cutoffDate,
+      Flow[] memory flows,
+      bool isSettled,
+      bool isAutoSettled
+    )
+  {
+    Settlement storage settlement = settlements[settlementId];
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    return (
+      settlement.settlementReference,
+      settlement.cutoffDate,
+      settlement.flows,
+      settlement.isSettled,
+      settlement.isAutoSettled
+    );
   }
 
   /**
@@ -374,9 +380,28 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   }
 
   /**
+   * @dev Check if a token is ERC-721
+   * @param token The address of the token to check.
+   * @return True if the token is ERC-721, false otherwise.
+   */
+  function isERC721(address token) external view returns (bool) {
+    return _isERC721(token);
+  }
+
+  /**
+   * @dev Check if token is potentially ERC-20. This is a heuristic, not a guarantee.
+   * ERC-20 tokens that do not return a valid value from `decimals()` will be misclassified.
+   * @param token The address of the token to check.
+   * @return True if the token is potentially ERC-20, false otherwise.
+   */
+  function isERC20(address token) external view returns (bool) {
+    return _isERC20(token);
+  }
+
+  /**
    * @dev Revokes approvals for multiple settlements and refunds ETH deposits.
    * @param settlementIds The ids of the settlements to revoke approvals for.
-   */ 
+   */
   function revokeApprovals(uint256[] calldata settlementIds) external nonReentrant {
     for (uint256 i = 0; i < settlementIds.length; i++) {
       uint256 settlementId = settlementIds[i];
@@ -401,11 +426,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   /**
    * @dev Withdraws ETH deposits after the cutoff date if the settlement wasn't executed.
    * @param settlementId The id of the settlement to withdraw ETH from.
-   */ 
+   */
   function withdrawETH(uint256 settlementId) external nonReentrant {
     Settlement storage settlement = settlements[settlementId];
     if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    if (block.timestamp <= settlement.cutoffDate) revert CutoffDatePassed();
+    if (block.timestamp <= settlement.cutoffDate) revert CutoffDateNotPassed();
     if (settlement.isSettled) revert SettlementAlreadyExecuted();
     if (settlement.ethDeposits[msg.sender] == 0) revert NoETHToWithdraw();
 
@@ -503,22 +528,17 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuard {
   }
 
   /**
-   * @dev Check if a token is ERC-721
-   * @param token The address of the token to check.
-   * @return True if the token is ERC-721, false otherwise.
+   * @dev Internal version of {isERC721}
    */
   function _isERC721(address token) internal view returns (bool) {
     return token.supportsInterface(type(IERC721).interfaceId);
   }
 
   /**
-   * @dev Check if token is potentially ERC-20. This is a heuristic, not a guarantee.
-   * ERC-20 tokens that do not return a valid value from `decimals()` will be misclassified.
-   * @param token The address of the token to check.
-   * @return True if the token is potentially ERC-20, false otherwise.
+   * @dev Internal version of {isERC20}
    */
-  function _isERC20(address token) public view returns (bool) {
-    (bool success, bytes memory result) = token.staticcall(abi.encodeWithSelector(bytes4(0x313ce567)));
+  function _isERC20(address token) internal view returns (bool) {
+    (bool success, bytes memory result) = token.staticcall(abi.encodeWithSelector(SELECTOR_ERC20_DECIMALS));
     return success && result.length == 32;
   }
 }

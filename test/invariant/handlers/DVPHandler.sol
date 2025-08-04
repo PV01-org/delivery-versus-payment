@@ -73,7 +73,6 @@ contract DVPHandler is Test {
     actors.push(makeAddr("Charlie"));
     actors.push(makeAddr("David"));
     for (uint256 i = 0; i < actors.length; i++) {
-      console.log("actor[%s]: %s", i, actors[i]);
       vm.deal(actors[i], 100 ether);
       ethBalances[actors[i]] = 100 ether;
     }

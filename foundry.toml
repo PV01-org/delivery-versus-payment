@@ -8,4 +8,9 @@ no_match_coverage = "src/mock/|test/|script/"
 line_length = 120
 tab_width = 2
 
+[invariant]
+runs = 100          # default 256
+depth = 50          # default 500
+show_metrics = true
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

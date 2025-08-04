@@ -23,7 +23,8 @@ import "forge-std/Test.sol";
  * All top level functions in this test contract are initially called by Forge fuzzer and given a msg.sender that is random.
  * Most top level functions use a "useActor" modifier that pranks the msg.sender to be one of the known actors (Alice, Bob etc).
  * However, a prank doesn't take effect until the NEXT EXTERNAL call. If you call an internal function from within this contract,
- * msg.sender will still be the fuzzed address, not Alice.
+ * msg.sender will still be the fuzzed address, not the pranked actor. If you call an external function in this contract
+ * using e.g. `this.function()`, then msg.sender will correctly be the pranked actor.
  */
 contract DVPHandler is Test {
   DeliveryVersusPaymentV1 public dvp;

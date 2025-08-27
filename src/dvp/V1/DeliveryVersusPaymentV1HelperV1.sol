@@ -149,7 +149,8 @@ contract DeliveryVersusPaymentV1HelperV1 {
         bool
       ) {
         bool found = false;
-        for (uint256 i = 0; i < flows.length; i++) {
+        uint256 lengthFlows = flows.length;
+        for (uint256 i = 0; i < lengthFlows; i++) {
           if (isTokenFilter) {
             if (flows[i].token == filterAddress) {
               found = true;
@@ -232,7 +233,8 @@ contract DeliveryVersusPaymentV1HelperV1 {
     IDeliveryVersusPaymentV1.Flow[] memory flows,
     TokenType tokenType
   ) internal pure returns (bool) {
-    for (uint256 i = 0; i < flows.length; i++) {
+    uint256 lengthFlows = flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
       // For Ether, the token address must be zero.
       if (tokenType == TokenType.Ether && flows[i].token == address(0)) {
         return true;

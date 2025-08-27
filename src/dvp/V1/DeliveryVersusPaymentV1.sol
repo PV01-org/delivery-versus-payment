@@ -143,8 +143,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     Settlement storage settlement = settlements[settlementId];
     if (settlement.flows.length == 0) revert SettlementDoesNotExist();
 
-    uint256 length = settlement.flows.length;
-    for (uint256 i = 0; i < length; i++) {
+    uint256 lengthFlows = settlement.flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
       address party = settlement.flows[i].from;
       if (!settlement.approvals[party]) {
         return false;
@@ -170,11 +170,13 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   function approveSettlements(uint256[] calldata settlementIds) external payable nonReentrant {
     uint256 totalEthRequired;
 
-    for (uint256 i = 0; i < settlementIds.length; i++) {
+    uint256 lengthSettlements = settlementIds.length;
+    for (uint256 i = 0; i < lengthSettlements; i++) {
       uint256 settlementId = settlementIds[i];
       Settlement storage settlement = settlements[settlementId];
 
-      if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+      uint256 lengthFlows = settlement.flows.length;
+      if (lengthFlows == 0) revert SettlementDoesNotExist();
       if (settlement.isSettled) revert SettlementAlreadyExecuted();
       if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
       if (settlement.approvals[msg.sender]) revert ApprovalAlreadyGranted();
@@ -182,8 +184,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       uint256 ethAmountRequired = 0;
       bool isInvolved = false;
 
-      uint256 length = settlement.flows.length;
-      for (uint256 j = 0; j < length; j++) {
+      for (uint256 j = 0; j < lengthFlows; j++) {
         Flow storage flow = settlement.flows[j];
         if (flow.from == msg.sender) {
           isInvolved = true;
@@ -210,7 +211,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     }
 
     // For any settlement: if we're last approver, and auto settlement is enabled, then execute that settlement
-    for (uint256 i = 0; i < settlementIds.length; i++) {
+    for (uint256 i = 0; i < lengthSettlements; i++) {
       uint256 settlementId = settlementIds[i];
       Settlement storage settlement = settlements[settlementId];
       if (settlement.isAutoSettled && isSettlementApproved(settlementId)) {
@@ -250,7 +251,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     bool isAutoSettled
   ) external returns (uint256) {
     if (block.timestamp > cutoffDate) revert CutoffDatePassed();
-    if (flows.length == 0) revert NoFlowsProvided();
+    uint256 lengthFlows = flows.length;
+    if (lengthFlows == 0) revert NoFlowsProvided();
 
     settlementIdCounter++;
     Settlement storage settlement = settlements[settlementIdCounter];
@@ -258,7 +260,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     settlement.cutoffDate = cutoffDate;
     settlement.isAutoSettled = isAutoSettled;
 
-    for (uint256 i = 0; i < flows.length; i++) {
+    for (uint256 i = 0; i < lengthFlows; i++) {
       Flow calldata flow = flows[i];
       if (flow.isNFT) {
         if (!_isERC721(flow.token)) revert InvalidERC721Token();
@@ -296,8 +298,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     if (settlement.isSettled) revert SettlementAlreadyExecuted();
     if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
 
-    uint256 length = settlement.flows.length;
-    for (uint256 i = 0; i < length; i++) {
+    uint256 lengthFlows = settlement.flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage flow = settlement.flows[i];
       if (flow.token == address(0)) {
         // ETH Transfer
@@ -403,7 +405,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementIds The ids of the settlements to revoke approvals for.
    */
   function revokeApprovals(uint256[] calldata settlementIds) external nonReentrant {
-    for (uint256 i = 0; i < settlementIds.length; i++) {
+    uint256 lengthSettlements = settlementIds.length;
+    for (uint256 i = 0; i < lengthSettlements; i++) {
       uint256 settlementId = settlementIds[i];
       Settlement storage settlement = settlements[settlementId];
       if (settlement.flows.length == 0) revert SettlementDoesNotExist();
@@ -463,8 +466,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     Settlement storage settlement,
     address party
   ) internal view returns (uint256 etherRequired, uint256 etherDeposited) {
-    uint256 length = settlement.flows.length;
-    for (uint256 i = 0; i < length; i++) {
+    uint256 lengthFlows = settlement.flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage flow = settlement.flows[i];
       if (flow.from == party && flow.token == address(0)) {
         etherRequired += flow.amountOrId;
@@ -485,11 +488,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     Settlement storage settlement,
     address party
   ) internal view returns (TokenStatus[] memory) {
-    uint256 length = settlement.flows.length;
-    TokenStatus[] memory tokenStatuses = new TokenStatus[](length);
+    uint256 lengthFlows = settlement.flows.length;
+    TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
 
-    for (uint256 i = 0; i < length; i++) {
+    for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage f = settlement.flows[i];
       if (f.from != party || f.token == address(0)) continue;
 

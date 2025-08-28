@@ -84,24 +84,24 @@ contract DVPHandler is Test {
    * msg.sender here is a fuzzer-chosen random address, not an actor, useActor only takes effect in external call.
    *
    * @param actorSeed Random seed to select which actor creates the settlement
-   * @param flowCount Random seed for number of flows (bounded 1-5)
+   * @param flowCountSeed Random seed for number of flows
    * @param cutoffSeed Random seed for cutoff date (bounded 1 hour - 7 days)
    * @param isAutoSettled Whether settlement should auto-execute after final approval
    */
   function createSettlement(
     uint256 actorSeed,
-    uint256 flowCount,
+    uint256 flowCountSeed,
     uint256 cutoffSeed,
     bool isAutoSettled
   ) external useActor(actorSeed) countCall("createSettlement") {
-    flowCount = bound(flowCount, 1, 5);
+    uint256 flowCount = bound(flowCountSeed, 1, 5);
     uint256 cutoffDate = block.timestamp + bound(cutoffSeed, 3600, 86400 * 7); // 1 hour to 7 days
 
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](flowCount);
 
     // Generate random flows
     for (uint256 i = 0; i < flowCount; i++) {
-      flows[i] = _generateFlow(i);
+      flows[i] = _generateFlow(actorSeed, i);
     }
 
     try dvp.createSettlement(flows, "Test Settlement", cutoffDate, isAutoSettled) returns (uint256 settlementId) {
@@ -177,9 +177,12 @@ contract DVPHandler is Test {
   }
 
   /// @dev Generates a random ETH flow for settlement creation
-  function _generateFlow(uint256 seed) internal view returns (IDeliveryVersusPaymentV1.Flow memory) {
-    address from = actors[bound(seed, 0, actors.length - 1)];
-    address to = actors[bound(seed + 1, 0, actors.length - 1)];
+  function _generateFlow(uint256 seed, uint256 salt) internal view returns (IDeliveryVersusPaymentV1.Flow memory) {
+    // Hash (seed + salt + starting string) to get an uncorrelated pair of actor indexes
+    uint256 fromIndex = bound(uint256(keccak256(abi.encode(seed, salt, "from"))), 0, actors.length - 1);
+    uint256 toIndex = bound(uint256(keccak256(abi.encode(seed, salt, "to"))), 0, actors.length - 1);
+    address from = actors[fromIndex];
+    address to = actors[toIndex];
 
     return
       IDeliveryVersusPaymentV1.Flow({

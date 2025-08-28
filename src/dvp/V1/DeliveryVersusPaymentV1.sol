@@ -249,17 +249,12 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     string calldata settlementReference,
     uint256 cutoffDate,
     bool isAutoSettled
-  ) external returns (uint256) {
+  ) external returns (uint256 id) {
     if (block.timestamp > cutoffDate) revert CutoffDatePassed();
     uint256 lengthFlows = flows.length;
     if (lengthFlows == 0) revert NoFlowsProvided();
 
-    settlementIdCounter++;
-    Settlement storage settlement = settlements[settlementIdCounter];
-    settlement.settlementReference = settlementReference;
-    settlement.cutoffDate = cutoffDate;
-    settlement.isAutoSettled = isAutoSettled;
-
+    // Validate flows
     for (uint256 i = 0; i < lengthFlows; i++) {
       Flow calldata flow = flows[i];
       if (flow.isNFT) {
@@ -267,11 +262,17 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       } else if (flow.token != address(0)) {
         if (!_isERC20(flow.token)) revert InvalidERC20Token();
       }
-      settlement.flows.push(flow);
     }
 
-    emit SettlementCreated(settlementIdCounter, msg.sender);
-    return settlementIdCounter;
+    // Store new settlement
+    id = ++settlementIdCounter;
+    Settlement storage settlement = settlements[id];
+    settlement.settlementReference = settlementReference;
+    settlement.cutoffDate = cutoffDate;
+    settlement.isAutoSettled = isAutoSettled;
+    settlement.flows = flows;
+
+    emit SettlementCreated(id, msg.sender);
   }
 
   /**

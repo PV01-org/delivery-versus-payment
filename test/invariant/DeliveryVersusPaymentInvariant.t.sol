@@ -30,8 +30,8 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
     // Register handler and its functions
     targetContract(address(handler));
     bytes4[] memory selectors = new bytes4[](3);
-    selectors[0] = DVPHandler.createSettlement.selector;
-    selectors[1] = DVPHandler.approveSettlement.selector;
+    selectors[0] = DVPHandler.createSettlementEth.selector;
+    selectors[1] = DVPHandler.approveSettlementEth.selector;
     selectors[2] = DVPHandler.executeSettlement.selector;
     targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
   }

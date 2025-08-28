@@ -15,8 +15,8 @@ import "forge-std/Test.sol";
  * - Maintains ghost variables to track system-wide state for invariant checking
  *
  * Handler functions:
- * 1. createSettlement: Create a settlement with multiple flows (all ETH for now)
- * 2. approveSettlement: Parties deposit ETH and approve the settlement
+ * 1. createSettlementEth: Create a settlement with multiple flows (all ETH for now)
+ * 2. approveSettlementEth: Parties deposit ETH and approve the settlement
  * 3. executeSettlement: Execute the settlement
  *
  * IMPORTANT:
@@ -88,12 +88,12 @@ contract DVPHandler is Test {
    * @param cutoffSeed Random seed for cutoff date (bounded 1 hour - 7 days)
    * @param isAutoSettled Whether settlement should auto-execute after final approval
    */
-  function createSettlement(
+  function createSettlementEth(
     uint256 actorSeed,
     uint256 flowCountSeed,
     uint256 cutoffSeed,
     bool isAutoSettled
-  ) external useActor(actorSeed) countCall("createSettlement") {
+  ) external useActor(actorSeed) countCall("createSettlementEth") {
     uint256 flowCount = bound(flowCountSeed, 1, 5);
     uint256 cutoffDate = block.timestamp + bound(cutoffSeed, 3600, 86400 * 7); // 1 hour to 7 days
 
@@ -124,10 +124,10 @@ contract DVPHandler is Test {
    * @param actorSeed Random seed to select which actor approves
    * @param settlementSeed Random seed to select which settlement to approve
    */
-  function approveSettlement(
+  function approveSettlementEth(
     uint256 actorSeed,
     uint256 settlementSeed
-  ) external useActor(actorSeed) countCall("approveSettlement") {
+  ) external useActor(actorSeed) countCall("approveSettlementEth") {
     if (settlementIds.length == 0) return;
 
     // Pick random settlement from existing ones created so far
@@ -178,7 +178,7 @@ contract DVPHandler is Test {
 
   /// @dev Generates a random ETH flow for settlement creation
   function _generateFlow(uint256 seed, uint256 salt) internal view returns (IDeliveryVersusPaymentV1.Flow memory) {
-    // Hash (seed + salt + starting string) to get an uncorrelated pair of actor indexes
+    // Generate hash of "seed + salt + any old string" to get uncorrelated pairs of actor indexes
     uint256 fromIndex = bound(uint256(keccak256(abi.encode(seed, salt, "from"))), 0, actors.length - 1);
     uint256 toIndex = bound(uint256(keccak256(abi.encode(seed, salt, "to"))), 0, actors.length - 1);
     address from = actors[fromIndex];
@@ -269,8 +269,8 @@ contract DVPHandler is Test {
     console.log("|  DVP Handler Call Summary for Last Run   |");
     console.log("+------------------------------------------+");
     console.log("Function calls:");
-    console.log("  createSettlement calls:", getCallCount("createSettlement"));
-    console.log("  approveSettlement calls:", getCallCount("approveSettlement"));
+    console.log("  createSettlementEth calls:", getCallCount("createSettlementEth"));
+    console.log("  approveSettlementEth calls:", getCallCount("approveSettlementEth"));
     console.log("  executeSettlement calls:", getCallCount("executeSettlement"));
     console.log("Settlement Counts:");
     console.log("  Total settlements created:", ghost_totalSettlementsCreated);

@@ -270,7 +270,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     settlement.settlementReference = settlementReference;
     settlement.cutoffDate = cutoffDate;
     settlement.isAutoSettled = isAutoSettled;
-    settlement.flows = flows;
+    settlement.flows = flows; // needs "via IR" compilation
 
     emit SettlementCreated(id, msg.sender);
   }

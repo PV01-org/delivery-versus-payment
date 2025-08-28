@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
 
@@ -23,7 +23,7 @@ contract MaliciousActorDVP {
     dvp = _dvp;
     reentrancyMode = ReentrancyMode.NoReentrancy;
   }
-  
+
   function setTargetSettlementId(uint256 _targetSettlementId) external {
     targetSettlementId = _targetSettlementId;
   }

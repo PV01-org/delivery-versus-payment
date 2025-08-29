@@ -11,4 +11,9 @@ via_ir = true
 line_length = 120
 tab_width = 2
 
+[invariant]
+runs = 5            # default 256
+depth = 1000        # default 500
+show_metrics = true
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

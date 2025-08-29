@@ -13,7 +13,7 @@ out/
 contracts/.deps/
 
 # Broadcasts
-!/broadcast
+/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 

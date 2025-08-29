@@ -15,7 +15,7 @@ if [[ -z "${PRIVATE_KEY:-}" ]]; then
 fi
 
 # Scope
-NETWORKS=(sepolia)
+NETWORKS=(arbsepolia)
 #NETWORKS=(sepolia arbsepolia fuji polygon avalanche ethereum)
 
 for NET in "${NETWORKS[@]}"; do

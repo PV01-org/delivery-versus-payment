@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Chainalysis sanctions list oracle https://go.chainalysis.com/chainalysis-oracle-docs.html
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 /**
  * @title ISanctionsList

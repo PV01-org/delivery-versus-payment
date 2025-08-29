@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
 import "@openzeppelin/contracts-v5-2-0/token/ERC20/ERC20.sol";

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 // Based on Chainalysis contract https://etherscan.io/address/0x40C57923924B5c5c5455c48D93317139ADDaC8fb#code
-pragma solidity 0.8.28;
+pragma solidity 0.8.30;
 
 import {Ownable} from "@openzeppelin/contracts-v5-2-0/access/Ownable.sol";
 import {ISanctionsList} from "./ISanctionsList.sol";

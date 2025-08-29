@@ -74,7 +74,7 @@ contract DVPHandler is Test {
     actors.push(makeAddr("Charlie"));
     actors.push(makeAddr("David"));
     for (uint256 i = 0; i < actors.length; i++) {
-      uint256 ethAmount = (2 ** i) * 20 ether;
+      uint256 ethAmount = (2 ** (i + 1)) * 10 ether;
       vm.deal(actors[i], ethAmount);
       ethBalances[actors[i]] = ethAmount;
     }
@@ -129,11 +129,7 @@ contract DVPHandler is Test {
     uint256 actorSeed,
     uint256 settlementSeed
   ) external useActor(actorSeed) countCall("approveSettlementEth") {
-    if (settlementIds.length == 0) return;
-
-    // Pick random settlement from existing ones created so far
-    uint256 settlementId = settlementIds[bound(settlementSeed, 0, settlementIds.length - 1)];
-    if (settlementExecuted[settlementId]) return;
+    uint256 settlementId = _getRandomSettlement(settlementSeed);
 
     // Calculate how much ETH the actor needs to deposit for their flows
     uint256 ethRequired = this.calculateEthRequiredForMsgSender(settlementId);
@@ -165,11 +161,7 @@ contract DVPHandler is Test {
     uint256 actorSeed,
     uint256 settlementSeed
   ) external useActor(actorSeed) countCall("executeSettlement") {
-    if (settlementIds.length == 0) return;
-
-    uint256 settlementId = settlementIds[bound(settlementSeed, 0, settlementIds.length - 1)];
-    if (settlementExecuted[settlementId]) return; // Can't execute twice
-
+    uint256 settlementId = _getRandomSettlement(settlementSeed);
     try dvp.executeSettlement(settlementId) {
       this.updateTrackingExecuteSettlement(settlementId, false);
     } catch {
@@ -193,6 +185,14 @@ contract DVPHandler is Test {
         to: to,
         amountOrId: bound(seed, 0.1 ether, 10 ether)
       });
+  }
+
+  /// @dev Get random settlement, or a non-existing one if none exist
+  function _getRandomSettlement(uint256 seed) internal view returns (uint256) {
+    if (settlementIds.length > 0) {
+      return settlementIds[bound(seed, 0, settlementIds.length - 1)];
+    }
+    return 999999; // Non-existing settlement
   }
 
   /// @dev Calculates ETH required for msg.sender to approve a settlement

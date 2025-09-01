@@ -14,9 +14,8 @@ if [[ -z "${PRIVATE_KEY:-}" ]]; then
   exit 1
 fi
 
-# Scope
-NETWORKS=(arbsepolia)
-#NETWORKS=(sepolia arbsepolia fuji polygon avalanche ethereum)
+# Scope. Network names match those defined in foundry.toml
+NETWORKS=(sepolia arbsepolia polygon fuji avalanche)
 
 for NET in "${NETWORKS[@]}"; do
   echo "Deploying DVP to $NET"

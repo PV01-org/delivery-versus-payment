@@ -11,6 +11,7 @@
 - [Installation](#installation)
 - [Commands](#commands)
 - [Deployed Addresses](#deployed-addresses)
+  - [Further Deployments](#further-deployments)
 - [Workflow Summary](#workflow-summary)
   - [Create a Settlement](#create-a-settlement)
   - [Approve a Settlement](#approve-a-settlement)
@@ -59,18 +60,36 @@ The following CLI commands are available:
 | 5 | Sizer          | `forge build --sizes`       | Report contract size.                     |
 
 ## Deployed Addresses
-The DVP contracts are available at the following addresses. Since the solution is permissionless, they can be freely used as they are, without needing further contract deployments:
-| Chain       | Instance    | Contract Etherscan Link          | Address                                      |
-|-------------|-------------|----------------------------------|----------------------------------------------|
-| Ethereum    | Mainnet     | DeliveryVersusPaymentV1          | `tbc`                                        |
-| Ethereum    | Mainnet     | DeliveryVersusPaymentV1HelperV1  | `tbc`                                        |
-| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1](https://sepolia.etherscan.io/address/0xa725759CA0a2c18E59495dE1029b84261cD29B3f)          | `0xa725759CA0a2c18E59495dE1029b84261cD29B3f` |
-| Ethereum    | Sepolia     | [DeliveryVersusPaymentV1HelperV1](https://sepolia.etherscan.io/address/0x0C5c8941B6A07626713aD42e561BFBbC6636f82A)  | `0x0C5c8941B6A07626713aD42e561BFBbC6636f82A` |
+The DVP contracts are available at the following addresses. Since the solution is permissionless, they can be freely used as they are, without needing further contract deployments. To deploy new contracts see [Further Deployments](#further-deployments).
+| Chain       | Instance          | Contract Block Explorer Link     | Address                                      |
+|-------------|-------------------|----------------------------------|----------------------------------------------|
+| Arbitrum    | Testnet (Sepolia) | [DeliveryVersusPaymentV1](https://sepolia.arbiscan.io/address/0xA19B617507fef9866Fc7465933f7e3D48C7Ca03C)          | `0xA19B617507fef9866Fc7465933f7e3D48C7Ca03C` |
+| Arbitrum    | Testnet (Sepolia) | [DeliveryVersusPaymentV1HelperV1](https://sepolia.arbiscan.io/address/0x83096F52F2C20373C11ADa557FD87DA8Db2b150a)  | `0x83096F52F2C20373C11ADa557FD87DA8Db2b150a` |
+| Avalanche   | Mainnet           | [DeliveryVersusPaymentV1](https://snowtrace.io/address/0xE87c95AB6a3e11e16E72A2b6234454Bb29130C95)          | `0xE87c95AB6a3e11e16E72A2b6234454Bb29130C95` |
+| Avalanche   | Mainnet           | [DeliveryVersusPaymentV1HelperV1](https://snowtrace.io/address/0xeDFDecC5e1932dd3D99Ee87f370FA89E1901F4F9)  | `0xeDFDecC5e1932dd3D99Ee87f370FA89E1901F4F9` |
+| Avalanche   | Testnet (Fuji)    | [DeliveryVersusPaymentV1](https://testnet.snowtrace.io/address/0xa70404d8ca272bE8bAA48A4b83ED94Db17068e05)          | `0xa70404d8ca272bE8bAA48A4b83ED94Db17068e05` |
+| Avalanche   | Testnet (Fuji)    | [DeliveryVersusPaymentV1HelperV1](https://testnet.snowtrace.io/address/0x8DdC71B21889dd727D7aC5432799406F2901E74a)  | `0x8DdC71B21889dd727D7aC5432799406F2901E74a` |
+| Ethereum    | Mainnet           | DeliveryVersusPaymentV1          | `tbc`                                        |
+| Ethereum    | Mainnet           | DeliveryVersusPaymentV1HelperV1  | `tbc`                                        |
+| Ethereum    | Testnet (Sepolia) | [DeliveryVersusPaymentV1](https://sepolia.etherscan.io/address/0x0DB7eb1E62514625E03AdE35E60df74Fb8e4E36a)          | `0x0DB7eb1E62514625E03AdE35E60df74Fb8e4E36a` |
+| Ethereum    | Testnet (Sepolia) | [DeliveryVersusPaymentV1HelperV1](https://sepolia.etherscan.io/address/0xE988E4A78DD4717C0E1f2182C257A459Fe06DF68)  | `0xE988E4A78DD4717C0E1f2182C257A459Fe06DF68` |
+| Polygon     | Mainnet           | [DeliveryVersusPaymentV1](https://polygonscan.com/address/0xFBdA0E404B429c878063b3252A2c2da14fe28e7f)          | `0xFBdA0E404B429c878063b3252A2c2da14fe28e7f` |
+| Polygon     | Mainnet           | [DeliveryVersusPaymentV1HelperV1](https://polygonscan.com/address/0x662E81BCfF1887C4F73f8086E9D0d590F85A7f1E)  | `0x662E81BCfF1887C4F73f8086E9D0d590F85A7f1E` |
 
-To deploy further copies, use the deploy scripts in the `./script` folder, for example:
+### Further Deployments
+To deploy further copies of individual contracts, use the deploy scripts in the `./script` folder, for example:
 
 ```bash
-forge script script/DeployDvp.s.sol --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+forge script script/DeployDvp.s.sol --rpc-url <$RPC_URL> --private-key <$PRIVATE_KEY> --broadcast
+```
+
+To deploy contracts on many chains follow these steps:
+1. Define the network names to deploy to in `foundry.toml`.
+2. Copy `.env.template` to `.env` and maintain environment variables. Network names should match those defined in `foundry.toml`.
+3. Edit the deploy script `deploy-multi-chain.sh` in the `.scripts` folder. Change the variable called `NETWORKS` to contain the network names you want to deploy to.
+4. Run:
+```bash
+./scripts/deploy-multi-chain.sh`
 ```
 
 ## Workflow Summary
@@ -123,17 +142,18 @@ Sequence diagram for a happy path process though a settlement with auto-settle e
 
 ## Events
 Topic0 values for events are:
-| Event                                  | topic0                                                             |
-|----------------------------------------|--------------------------------------------------------------------|
-| ETHReceived                            | 0xbfe611b001dfcd411432f7bf0d79b82b4b2ee81511edac123a3403c357fb972a |
-| ETHWithdrawn                           | 0x94b2de810873337ed265c5f8cf98c9cffefa06b8607f9a2f1fbaebdfbcfbef1c |
-| SettlementApprovalRevoked              | 0x96c5a579760c144ad93a5c19d41440d5185ba0451704c0ac7cb22488d8735ac2 |
-| SettlementApproved                     | 0x7f89b61c53062fb158619c7b66552eabdfb0e1d37c439a62c2d2b5a657bcea93 |
-| SettlementAutoExecutionFailedOther     | 0x63c222ac809d589e48426985c6af11739f936b405e0a78a920fbae6565c07497 |
-| SettlementAutoExecutionFailedPanic     | 0x3ad9899b9bd85d1d9b8ab792041d08fe646b2d286885240f5baa3cbc1d721270 |
-| SettlementAutoExecutionFailedReason    | 0xe1c01819733d746479549271d3a51445514b8f678614d50ad34d305c67b83d9c |
-| SettlementCreated                      | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
-| SettlementExecuted                     | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
+
+| Event                                                       | Topic0                                                             |
+|-------------------------------------------------------------|--------------------------------------------------------------------|
+| ETHReceived(address,uint256)                                | 0xbfe611b001dfcd411432f7bf0d79b82b4b2ee81511edac123a3403c357fb972a |
+| ETHWithdrawn(address,uint256)                               | 0x94b2de810873337ed265c5f8cf98c9cffefa06b8607f9a2f1fbaebdfbcfbef1c |
+| SettlementApprovalRevoked(uint256,address)                  | 0x96c5a579760c144ad93a5c19d41440d5185ba0451704c0ac7cb22488d8735ac2 |
+| SettlementApproved(uint256,address)                         | 0x7f89b61c53062fb158619c7b66552eabdfb0e1d37c439a62c2d2b5a657bcea93 |
+| SettlementAutoExecutionFailedOther(uint256,address,bytes)   | 0x63c222ac809d589e48426985c6af11739f936b405e0a78a920fbae6565c07497 |
+| SettlementAutoExecutionFailedPanic(uint256,address,uint256) | 0x3c4e728bba5a6c57290cee894ede5970e12dc7d459808344b14cec9a956f1dc2 |
+| SettlementAutoExecutionFailedReason(uint256,address,string) | 0xe1c01819733d746479549271d3a51445514b8f678614d50ad34d305c67b83d9c |
+| SettlementCreated(uint256,address)                          | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
+| SettlementExecuted(uint256,address)                         | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.

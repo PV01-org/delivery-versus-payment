@@ -9,21 +9,23 @@ via_ir = true
 
 [rpc_endpoints]
 sepolia = "${RPC_SEPOLIA}"
+ethereum = "${RPC_ETHEREUM}"
 arbsepolia = "${RPC_ARBSEPOLIA}"
 fuji = "${RPC_FUJI}"
-polygon = "${RPC_POLYGON}"
 avalanche = "${RPC_AVALANCHE}"
-ethereum = "${RPC_ETHEREUM}"
+amoy = "${RPC_AMOY}"
+polygon = "${RPC_POLYGON}"
 
 [etherscan]
 # https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#etherscan-api-key-settings
 # also has optional url attribute
 sepolia = { key = "${ETHERSCAN_API_KEY}" }
+ethereum = { key = "${ETHERSCAN_API_KEY}" }
 arbsepolia = { key = "${ARBISCAN_API_KEY}" }
 fuji = { key = "${SNOWTRACE_API_KEY}", url = "${SNOWTRACE_FUJI_URL}" }
+avalanche = { key = "${SNOWTRACE_API_KEY}", url = "${SNOWTRACE_AVALANCHE_URL}" }
+amoy = { key = "${POLYGONSCAN_API_KEY}" }
 polygon = { key = "${POLYGONSCAN_API_KEY}" }
-avalanche = { key = "${SNOWTRACE_API_KEY}", url = "${SNOWTRACE_AVALANCHE_URL}"}
-ethereum = { key = "${ETHERSCAN_API_KEY}" }
 
 [fmt]
 line_length = 120

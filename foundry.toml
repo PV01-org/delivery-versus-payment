@@ -7,6 +7,24 @@ optimizer = true
 optimizer_runs = 200
 via_ir = true
 
+[rpc_endpoints]
+arbsepolia = "${RPC_ARBSEPOLIA}"
+avalanche = "${RPC_AVALANCHE}"
+ethereum = "${RPC_ETHEREUM}"
+fuji = "${RPC_FUJI}"
+polygon = "${RPC_POLYGON}"
+sepolia = "${RPC_SEPOLIA}"
+
+[etherscan]
+# https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#etherscan-api-key-settings
+# also has optional url attribute
+arbsepolia = { key = "${ARBISCAN_API_KEY}" }
+avalanche = { key = "${SNOWTRACE_API_KEY}", url = "${SNOWTRACE_AVALANCHE_URL}" }
+ethereum = { key = "${ETHERSCAN_API_KEY}" }
+fuji = { key = "${SNOWTRACE_API_KEY}", url = "${SNOWTRACE_FUJI_URL}" }
+polygon = { key = "${POLYGONSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
+
 [fmt]
 line_length = 120
 tab_width = 2

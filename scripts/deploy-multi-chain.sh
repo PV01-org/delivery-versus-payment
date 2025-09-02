@@ -14,23 +14,6 @@ if [[ -z "${PRIVATE_KEY:-}" ]]; then
   exit 1
 fi
 
-# Scope. Network names match those defined in foundry.toml
-NETWORKS=(sepolia arbsepolia polygon fuji avalanche)
-
-for NET in "${NETWORKS[@]}"; do
-  echo "Deploying DVP to $NET"
-  forge script script/DeployDvp.s.sol:Deploy \
-    --rpc-url "$NET" \
-    --broadcast \
-    --verify \
-    --private-key "$PRIVATE_KEY"
-
-  echo "Deploying DVP Helper to $NET"
-  forge script script/DeployDvpHelper.s.sol:Deploy \
-    --rpc-url "$NET" \
-    --broadcast \
-    --verify \
-    --private-key "$PRIVATE_KEY"
 # Supported networks list — edit here to add/remove supported networks.
 # Network names need to match those defined in foundry.toml
 SUPPORTED_NETWORKS=(
@@ -114,7 +97,7 @@ if [[ ${#INVALID_NETWORKS[@]} -gt 0 ]]; then
   exit 1
 fi
 
-# Deploymen function
+# Deployment function
 deploy_to_network() {
   local network="$1"
   echo "Deploying to $network ..."

@@ -284,6 +284,121 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   }
 
   /**
+   * @dev Executes a netted version of an existing settlement. Validates that the provided nettedFlows are
+   * equivalent to the originally stored flows for each party and asset (including NFTs treated per-tokenId),
+   * then executes only the netted flows. Uses pre-deposited ETH for ETH legs and refunds any remaining deposits
+   * to all involved parties after execution. NFTs are not netted off-chain in practice, but validation supports
+   * any equivalent decomposition.
+   * @param settlementId The id of the settlement to execute in netted form.
+   * @param nettedFlows The netted set of flows computed off-chain.
+   */
+  function executeNettedSettlement(uint256 settlementId, Flow[] calldata nettedFlows) external nonReentrant {
+    Settlement storage settlement = settlements[settlementId];
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
+    if (settlement.isSettled) revert SettlementAlreadyExecuted();
+    if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
+
+    // Gather unique parties and asset keys from original flows
+    uint256 lengthOriginalFlows = settlement.flows.length;
+    uint256 maxParties = lengthOriginalFlows * 2;
+    address[] memory parties = new address[](maxParties);
+    uint256 partyCount = 0;
+
+    uint256 maxKeys = lengthOriginalFlows;
+    bytes32[] memory keys = new bytes32[](maxKeys);
+    uint256 keyCount = 0;
+
+    for (uint256 i = 0; i < lengthOriginalFlows; i++) {
+      Flow storage f = settlement.flows[i];
+      // Track parties
+      uint256 idxFrom = _indexOfAddress(parties, partyCount, f.from);
+      if (idxFrom == type(uint256).max) {
+        parties[partyCount++] = f.from;
+      }
+      uint256 idxTo = _indexOfAddress(parties, partyCount, f.to);
+      if (idxTo == type(uint256).max) {
+        parties[partyCount++] = f.to;
+      }
+      // Track asset keys
+      bytes32 key = _assetKey(f.token, f.isNFT, f.amountOrId);
+      uint256 keyIdx = _indexOfBytes32(keys, keyCount, key);
+      if (keyIdx == type(uint256).max) {
+        keys[keyCount++] = key;
+      }
+    }
+
+    // Allocate balances matrix: [keyCount][partyCount] flattened
+    int256[] memory balances = new int256[](partyCount * keyCount);
+
+    // Step 1: Apply original flows positively
+    for (uint256 i = 0; i < lengthOriginalFlows; i++) {
+      Flow storage flow = settlement.flows[i];
+      require(flow.amountOrId > 0, "Zero amountOrId");
+
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
+      uint256 k = _indexOfBytes32(keys, keyCount, key);
+      uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, flow.to);
+
+      int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      uint256 idxA = k * partyCount + pFrom;
+      uint256 idxB = k * partyCount + pTo;
+      balances[idxA] -= delta;
+      balances[idxB] += delta;
+    }
+
+    // Step 2: Apply netted flows with flipped signs (subtract netted effect)
+    uint256 lengthNettedFlows = nettedFlows.length;
+    for (uint256 i = 0; i < lengthNettedFlows; i++) {
+      Flow calldata flow = nettedFlows[i];
+      require(flow.amountOrId > 0, "Zero netted amountOrId");
+
+      // Both parties must be from original settlement
+      uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, flow.to);
+      require(pFrom != type(uint256).max && pTo != type(uint256).max, "Unknown party in netted flow");
+
+      // Asset must exist in original
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
+      uint256 k = _indexOfBytes32(keys, keyCount, key);
+      require(k != type(uint256).max, "Unknown asset in netted flow");
+
+      int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      uint256 idxA = k * partyCount + pFrom;
+      uint256 idxB = k * partyCount + pTo;
+      balances[idxA] += delta; // flip signs compared to originals
+      balances[idxB] -= delta;
+    }
+
+    // Step 3: Validate all balances are zero (equivalence)
+    for (uint256 k = 0; k < keyCount; k++) {
+      for (uint256 p = 0; p < partyCount; p++) {
+        require(balances[k * partyCount + p] == 0, "Balance mismatch");
+      }
+    }
+
+    // Step 4: Execute netted flows
+    _executeFlowsFromCalldata(settlement, nettedFlows);
+
+    // Step 5: Refund remaining ETH deposits for all involved parties
+    for (uint256 p = 0; p < partyCount; p++) {
+      address party = parties[p];
+      uint256 remaining = settlement.ethDeposits[party];
+      if (remaining > 0) {
+        settlement.ethDeposits[party] = 0;
+        Address.sendValue(payable(party), remaining);
+        emit ETHWithdrawn(party, remaining);
+      }
+    }
+
+
+    // Step 6: Mark as settled and emit event
+    settlement.isSettled = true;
+    emit SettlementExecuted(settlementId, msg.sender);
+  }
+
+  /**
    * @dev Execute a single settlement. This is an external function, so that it can be used
    * inside a try/catch, but it behaves like an internal function, in that the caller must
    * be the self contract or the call with revert.
@@ -299,24 +414,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     if (settlement.isSettled) revert SettlementAlreadyExecuted();
     if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
 
-    uint256 lengthFlows = settlement.flows.length;
-    for (uint256 i = 0; i < lengthFlows; i++) {
-      Flow storage flow = settlement.flows[i];
-      if (flow.token == address(0)) {
-        // ETH Transfer
-        // Note: settlement.ethDeposits[flow.from] must == flow.amount, otherwise approval would not have been
-        // possible and isSettlementApproved() would have failed. So no need to check for insufficient balance.
-        uint256 amount = flow.amountOrId;
-        settlement.ethDeposits[flow.from] -= amount;
-        // sendValue reverts if unsuccessful
-        Address.sendValue(payable(flow.to), amount);
-      } else {
-        // ERC-721 or ERC-20 transfer in the same way (must cast to IERC20 for OZ safeTransfer for ERC-20)
-        IERC20 eitherToken = IERC20(flow.token);
-        // safeTransfer reverts if unsuccessful for ERC-20 and ERC-721
-        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
-      }
-    }
+    _executeFlowsFromStorage(settlement);
 
     settlement.isSettled = true;
     emit SettlementExecuted(settlementId, originalCaller);
@@ -456,6 +554,40 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   //------------------------------------------------------------------------------
   // Internal
   //------------------------------------------------------------------------------
+  // Internal execution helpers
+  // Executes flows stored in settlement.flows
+  function _executeFlowsFromStorage(Settlement storage settlement) internal {
+    uint256 lengthFlows = settlement.flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      Flow storage flow = settlement.flows[i];
+      if (flow.token == address(0)) {
+        uint256 amount = flow.amountOrId;
+        settlement.ethDeposits[flow.from] -= amount;
+        Address.sendValue(payable(flow.to), amount);
+      } else {
+        IERC20 eitherToken = IERC20(flow.token);
+        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
+      }
+    }
+  }
+
+  // Executes flows provided in calldata (used for netted settlements)
+  function _executeFlowsFromCalldata(Settlement storage settlement, Flow[] calldata flows) internal {
+    uint256 lengthFlows = flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      Flow calldata flow = flows[i];
+      if (flow.token == address(0)) {
+        uint256 amount = flow.amountOrId;
+        require(settlement.ethDeposits[flow.from] >= amount, "Insufficient ETH deposit");
+        settlement.ethDeposits[flow.from] -= amount;
+        Address.sendValue(payable(flow.to), amount);
+      } else {
+        IERC20 eitherToken = IERC20(flow.token);
+        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
+      }
+    }
+  }
+
   /**
    * @dev Internal helper to get ETH required and deposited for a party.
    * @param settlement The settlement to check.
@@ -529,6 +661,29 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     }
 
     return tokenStatuses;
+  }
+
+  /**
+   * @dev Internal version of {isERC721}
+   */
+  // Helper to compute asset key for balances: ERC-20/ETH use token address; ERC-721 uses keccak(token, id)
+  function _assetKey(address token, bool isNFT, uint256 amountOrId) internal pure returns (bytes32) {
+    return isNFT ? keccak256(abi.encode(token, amountOrId)) : bytes32(uint256(uint160(token)));
+  }
+
+  // Linear search helpers over memory arrays (sufficient for typical small settlements)
+  function _indexOfAddress(address[] memory arr, uint256 length, address a) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == a) return i;
+    }
+    return type(uint256).max;
+  }
+
+  function _indexOfBytes32(bytes32[] memory arr, uint256 length, bytes32 k) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == k) return i;
+    }
+    return type(uint256).max;
   }
 
   /**

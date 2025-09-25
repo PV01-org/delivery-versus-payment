@@ -463,4 +463,65 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     assertEq(ids2.length, 0);
     assertEq(ids3.length, 0);
   }
+
+  //--------------------------------------------------------------------------------
+  // computeNettedFlows Tests
+  //--------------------------------------------------------------------------------
+  function test_computeNettedFlows_ERC20Chain_GeneratesMinimalAndExecutes() public {
+    // Create a settlement with a USDC chain that nets down
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 100);
+    flows[1] = _createERC20Flow(bob, charlie, usdc, 70);
+    flows[2] = _createERC20Flow(charlie, alice, usdc, 20);
+
+    uint256 settlementId = dvp.createSettlement(flows, "USDC chain", _getFutureTimestamp(7 days), false);
+
+    // Approvals (allowances for ERC20 and DVP approvals by from-parties)
+    _approveERC20(alice, usdc, 100);
+    _approveERC20(bob, usdc, 70);
+    _approveERC20(charlie, usdc, 20);
+
+    uint256[] memory ids = _getSettlementIdArray(settlementId);
+    vm.prank(alice);
+    dvp.approveSettlements(ids);
+    vm.prank(bob);
+    dvp.approveSettlements(ids);
+    vm.prank(charlie);
+    dvp.approveSettlements(ids);
+
+    assertTrue(dvp.isSettlementApproved(settlementId));
+
+    // Compute netted flows via helper
+    IDeliveryVersusPaymentV1.Flow[] memory netted = dvpHelper.computeNettedFlows(address(dvp), settlementId);
+
+    // Expect 2 netted transfers: Alice->Bob 30, Alice->Charlie 50 (order is deterministic by helper)
+    assertEq(netted.length, 2, "Expected two netted flows for USDC");
+    assertEq(netted[0].token, usdc);
+    assertFalse(netted[0].isNFT);
+    assertEq(netted[0].from, alice);
+    assertEq(netted[0].to, bob);
+    assertEq(netted[0].amountOrId, 30);
+
+    assertEq(netted[1].token, usdc);
+    assertFalse(netted[1].isNFT);
+    assertEq(netted[1].from, alice);
+    assertEq(netted[1].to, charlie);
+    assertEq(netted[1].amountOrId, 50);
+
+    // Snapshot balances and execute
+    uint256 aBefore = AssetToken(usdc).balanceOf(alice);
+    uint256 bBefore = AssetToken(usdc).balanceOf(bob);
+    uint256 cBefore = AssetToken(usdc).balanceOf(charlie);
+
+    dvp.executeNettedSettlement(settlementId, netted);
+
+    // Check net deltas: Alice -80, Bob +30, Charlie +50
+    assertEq(AssetToken(usdc).balanceOf(alice), aBefore - 80);
+    assertEq(AssetToken(usdc).balanceOf(bob), bBefore + 30);
+    assertEq(AssetToken(usdc).balanceOf(charlie), cBefore + 50);
+
+    // isSettled set
+    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    assertTrue(isSettled);
+  }
 }

@@ -43,6 +43,13 @@ contract DeliveryVersusPaymentV1HelperV1 {
     string name;
   }
 
+  // Asset key and metadata used for netting computation
+  struct AssetMeta {
+    address token; // token address or address(0) for ETH
+    bool isNFT;    // true for ERC-721
+    uint256 id;    // tokenId for NFT; 0 for fungibles (ERC20/ETH)
+  }
+
   //------------------------------------------------------------------------------
   // External
   //------------------------------------------------------------------------------
@@ -112,6 +119,121 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 pageSize
   ) external view validPageSize(pageSize) returns (uint256[] memory settlementIds, uint256 nextCursor) {
     return _getPagedSettlementIdsByType(dvpAddress, startCursor, pageSize, tokenType);
+  }
+
+  /**
+   * @dev Computes an optimized netted array of flows for a given settlement.
+   * It minimizes fungible transfers per token (including ETH) by netting balances per party and
+   * pairing debtors and creditors greedily. NFTs are handled per tokenId with at most one transfer.
+   *
+   * This is a simple, ready-to-use greedy optimizer meant for clients to call directly (on-chain or via SDKs).
+   * While it typically produces a small number of transfers and good gas characteristics, for best possible
+   * optimization (e.g., strictly minimal number of fungible transfers across complex graphs), we suggest
+   * computing netting off-chain using a MILP/LP solver and then submitting the result to executeNettedSettlement.
+   *
+   * Reverts if the underlying DVP.getSettlement() call fails (e.g., non-existent settlement).
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the target settlement.
+   * @return netted An array of flows representing a netted execution plan equivalent to the original.
+   */
+  function computeNettedFlows(
+    address dvpAddress,
+    uint256 settlementId
+  ) external view returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
+    IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
+    // Retrieve flows (bubble up any revert from DVP)
+    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(settlementId);
+
+    uint256 lengthFlows = flows.length;
+    // Upper bound for netted flows is original length
+    netted = new IDeliveryVersusPaymentV1.Flow[](lengthFlows);
+    uint256 outCount = 0;
+
+    // 1) Build unique parties and asset metas
+    address[] memory parties = new address[](lengthFlows * 2);
+    uint256 partyCount = 0;
+    AssetMeta[] memory assets = new AssetMeta[](lengthFlows);
+    uint256 assetCount = 0;
+
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      // Parties
+      uint256 idxFrom = _indexOfAddress(parties, partyCount, f.from);
+      if (idxFrom == type(uint256).max) {
+        parties[partyCount++] = f.from;
+      }
+      uint256 idxTo = _indexOfAddress(parties, partyCount, f.to);
+      if (idxTo == type(uint256).max) {
+        parties[partyCount++] = f.to;
+      }
+      // Assets
+      AssetMeta memory meta = AssetMeta({token: f.token, isNFT: f.isNFT, id: f.isNFT ? f.amountOrId : 0});
+      uint256 aIdx = _indexOfAssetMeta(assets, assetCount, meta);
+      if (aIdx == type(uint256).max) {
+        assets[assetCount++] = meta;
+      }
+    }
+
+    // 2) Build balances matrix [assetCount][partyCount] flattened
+    int256[] memory balances = new int256[](assetCount * partyCount);
+
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      AssetMeta memory meta = AssetMeta({token: f.token, isNFT: f.isNFT, id: f.isNFT ? f.amountOrId : 0});
+      uint256 k = _indexOfAssetMeta(assets, assetCount, meta);
+      uint256 pFrom = _indexOfAddress(parties, partyCount, f.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, f.to);
+      int256 delta = f.isNFT ? int256(1) : int256(f.amountOrId);
+      uint256 idxA = k * partyCount + pFrom;
+      uint256 idxB = k * partyCount + pTo;
+      balances[idxA] -= delta;
+      balances[idxB] += delta;
+    }
+
+    // 3) Convert balances per asset into netted flows
+    for (uint256 k = 0; k < assetCount; k++) {
+      if (assets[k].isNFT) {
+        // Find -1 and +1 parties (there should be at most one of each per tokenId)
+        address fromAddr = address(0);
+        address toAddr = address(0);
+        uint256 base = k * partyCount;
+        for (uint256 p = 0; p < partyCount; p++) {
+          int256 b = balances[base + p];
+          if (b == -1) {
+            fromAddr = parties[p];
+          } else if (b == 1) {
+            toAddr = parties[p];
+          }
+        }
+        if (fromAddr != address(0) && toAddr != address(0)) {
+          netted[outCount++] = IDeliveryVersusPaymentV1.Flow({
+            token: assets[k].token,
+            isNFT: true,
+            from: fromAddr,
+            to: toAddr,
+            amountOrId: assets[k].id
+          });
+        }
+        // else fully canceled path -> no transfer needed
+      } else {
+        outCount = _appendNettedFungible(
+          assets[k].token,
+          parties,
+          balances,
+          k * partyCount,
+          partyCount,
+          netted,
+          outCount
+        );
+      }
+    }
+
+    // 4) Trim output array without using assembly (copy to exact-sized array)
+    IDeliveryVersusPaymentV1.Flow[] memory trimmed = new IDeliveryVersusPaymentV1.Flow[](outCount);
+    for (uint256 t = 0; t < outCount; t++) {
+      trimmed[t] = netted[t];
+    }
+    return trimmed;
   }
 
   //------------------------------------------------------------------------------
@@ -249,5 +371,83 @@ contract DeliveryVersusPaymentV1HelperV1 {
       }
     }
     return false;
+  }
+
+  // ---- Netting helpers (memory-only) ----
+  function _indexOfAddress(address[] memory arr, uint256 length, address a) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == a) return i;
+    }
+    return type(uint256).max;
+  }
+
+  function _indexOfAssetMeta(AssetMeta[] memory arr, uint256 length, AssetMeta memory m) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      AssetMeta memory x = arr[i];
+      if (x.token == m.token && x.isNFT == m.isNFT && x.id == m.id) {
+        return i;
+      }
+    }
+    return type(uint256).max;
+  }
+
+  // Appends netted fungible flows for a single asset into `out`, returns new outCount
+  function _appendNettedFungible(
+    address token,
+    address[] memory parties,
+    int256[] memory balances,
+    uint256 baseIndex, // offset into balances for this asset (k * partyCount)
+    uint256 partyCount,
+    IDeliveryVersusPaymentV1.Flow[] memory out,
+    uint256 outCount
+  ) internal pure returns (uint256) {
+    uint256[] memory negIdx = new uint256[](partyCount);
+    uint256[] memory posIdx = new uint256[](partyCount);
+    uint256[] memory negAmt = new uint256[](partyCount);
+    uint256[] memory posAmt = new uint256[](partyCount);
+    uint256 ni = 0;
+    uint256 pj = 0;
+
+    for (uint256 p = 0; p < partyCount; p++) {
+      int256 b = balances[baseIndex + p];
+      if (b < 0) {
+        negIdx[ni] = p;
+        negAmt[ni] = uint256(-b);
+        ni++;
+      } else if (b > 0) {
+        posIdx[pj] = p;
+        posAmt[pj] = uint256(b);
+        pj++;
+      }
+    }
+
+    uint256 iNeg = 0;
+    uint256 jPos = 0;
+    while (iNeg < ni && jPos < pj) {
+      uint256 x = negAmt[iNeg];
+      uint256 y = posAmt[jPos];
+      uint256 amt = x < y ? x : y;
+      if (amt > 0) {
+        out[outCount++] = IDeliveryVersusPaymentV1.Flow({
+          token: token,
+          isNFT: false,
+          from: parties[negIdx[iNeg]],
+          to: parties[posIdx[jPos]],
+          amountOrId: amt
+        });
+      }
+      if (x <= y) {
+        iNeg++;
+        if (x < y) {
+          posAmt[jPos] = y - x;
+        } else {
+          jPos++;
+        }
+      } else {
+        jPos++;
+        negAmt[iNeg] = x - y;
+      }
+    }
+    return outCount;
   }
 }

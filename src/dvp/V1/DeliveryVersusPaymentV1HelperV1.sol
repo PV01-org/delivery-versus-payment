@@ -50,6 +50,13 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 id;    // tokenId for NFT; 0 for fungibles (ERC20/ETH)
   }
 
+  // Net requirement result struct
+  struct NetRequirement {
+    uint256 ethRequiredNet;          // Net ETH the party must send with approveSettlements (0 if net receiver or neutral)
+    address[] erc20Tokens;           // Distinct ERC20 token addresses for which approvals may be needed
+    uint256[] erc20NetRequired;      // Minimal ERC20 allowance amounts (net outgoing per token; 0 entries are omitted)
+  }
+
   //------------------------------------------------------------------------------
   // External
   //------------------------------------------------------------------------------
@@ -129,7 +136,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * This is a simple, ready-to-use greedy optimizer meant for clients to call directly (on-chain or via SDKs).
    * While it typically produces a small number of transfers and good gas characteristics, for best possible
    * optimization (e.g., strictly minimal number of fungible transfers across complex graphs), we suggest
-   * computing netting off-chain using a MILP/LP solver and then submitting the result to executeNettedSettlement.
+   * computing netting off-chain using a MILP/LP solver and then submitting the result to executeSettlementNetted.
    *
    * Reverts if the underlying DVP.getSettlement() call fails (e.g., non-existent settlement).
    * @param dvpAddress Address of the DVP contract.
@@ -450,4 +457,95 @@ contract DeliveryVersusPaymentV1HelperV1 {
     }
     return outCount;
   }
+
+  /**
+   * @notice Compute minimal per-party requirements for a given settlement.
+   * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan (as enforced by DVP.executeSettlementNetted).
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * Reverts if the underlying DVP.getSettlement() call fails.
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the settlement.
+   * @param party Address of the party to compute requirements for.
+   * @return result NetRequirement data struct with ETH and ERC20 requirements.
+   */
+  function computeNetRequirementsForParty(
+    address dvpAddress,
+    uint256 settlementId,
+    address party
+  ) external view returns (
+    NetRequirement memory result
+  ) {
+    IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
+    return _computeNetRequirementsForParty(netted, party);
+  }
+  /**
+  * @notice Compute net requirements for a party from netted flows.
+  * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
+  * when executing via a debtor→creditor netted plan.
+  * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+  * @param flows Array of netted flows to analyze.
+  * @param party Address of the party to compute requirements for.
+  * @return result NetRequirement data struct with ETH and ERC20 requirements.
+  */
+  function _computeNetRequirementsForParty(IDeliveryVersusPaymentV1.Flow[] memory flows, address party) internal pure returns (
+    NetRequirement memory result
+  ) {
+    for (uint256 i = 0; i < flows.length; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      if (f.from == party) {
+        if (f.token == address(0)) {
+          // ETH leg
+          result.ethRequiredNet += f.amountOrId;
+        } else if (!f.isNFT) {
+          // ERC20 leg: accumulate per token net (outgoing only)
+          uint256 idx = _indexOfAddress(result.erc20Tokens, result.erc20Tokens.length, f.token);
+          if (idx == type(uint256).max) {
+            // New token, expand arrays
+            uint256 oldLen = result.erc20Tokens.length;
+            address[] memory newTokens = new address[](oldLen + 1);
+            uint256[] memory newAmounts = new uint256[](oldLen + 1);
+            for (uint256 j = 0; j < oldLen; j++) {
+              newTokens[j] = result.erc20Tokens[j];
+              newAmounts[j] = result.erc20NetRequired[j];
+            }
+            newTokens[oldLen] = f.token;
+            newAmounts[oldLen] = f.amountOrId;
+            result.erc20Tokens = newTokens;
+            result.erc20NetRequired = newAmounts;
+          } else {
+            // Existing token, accumulate
+            result.erc20NetRequired[idx] += f.amountOrId;
+          }
+        }
+        // NFTs ignored for this computation
+      }
+    }
+  }
+  /**
+   * @notice Compute minimal per-party requirements for a given settlement for an array of parties.
+   * @dev Returns the net ETH each given party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan (as enforced by DVP.executeSettlementNetted).
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * Reverts if the underlying DVP.getSettlement() call fails.
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the settlement.
+   * @param parties Array of addresses of the parties to compute requirements for.
+   * @return results Array of NetRequirement data structs with ETH and ERC20 requirements for each party.
+   */
+  function computeNetRequirementsForParties(
+    address dvpAddress,
+    uint256 settlementId,
+    address[] calldata parties
+  ) external view returns (
+    NetRequirement[] memory results
+  ) {
+    IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
+
+    results = new NetRequirement[](parties.length);
+    for (uint256 i = 0; i < parties.length; i++) {
+      results[i] = _computeNetRequirementsForParty(netted, parties[i]);
+    }
+  }
+
 }

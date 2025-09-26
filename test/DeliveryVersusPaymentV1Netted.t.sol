@@ -7,7 +7,7 @@ import {IDeliveryVersusPaymentV1 as ICore} from "../src/dvp/V1/IDeliveryVersusPa
 
 /**
  * @title DeliveryVersusPaymentV1NettedTest
- * @notice Extensive tests for executeNettedSettlement covering success paths, validation, refunds, and error cases.
+ * @notice Extensive tests for executeSettlementNetted covering success paths, validation, refunds, and error cases.
  */
 contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
   //--------------------------------------------------------------------------------
@@ -39,9 +39,9 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     cutoff = _getFutureTimestamp(7 days);
 
     // ETH deposits required per original
-    ethA = tenEth; // A must deposit 10
-    ethB = 4 ether; // B must deposit 4
-    ethC = 3 ether; // C must deposit 3
+    ethA = 7 ether; // A must deposit 7 ether
+    ethB = 0 ether; // B must deposit 0 ether
+    ethC = 0 ether; // C must deposit 0 ether
   }
 
   function _approveAllForMixedFlows(uint256 settlementId) internal {
@@ -63,10 +63,10 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   // Success path tests
   //--------------------------------------------------------------------------------
-  function test_executeNettedSettlement_MixedAssets_EquivalentAndRefundsETH() public {
+  function test_executeSettlementNetted_MixedAssets_EquivalentAndRefundsETH() public {
     // Arrange
     (ICore.Flow[] memory flows, uint256 cutoff, uint256 ethA, uint256 ethB, uint256 ethC) = _createMixedFlowsForNetting();
-    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false, true);
 
     // Approvals and deposits/allowances
     _approveERC20(alice, usdc, 50);
@@ -105,7 +105,7 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     address prevOwnerDaisy = NFT(nftCat).ownerOf(NFT_CAT_DAISY);
 
     // Act
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
 
     // Assert ERC20 balances changed as expected
     assertEq(AssetToken(usdc).balanceOf(alice), aliceUSDCBefore - 50, "Alice USDC decreased by 50");
@@ -137,12 +137,12 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   // Revert: not approved
   //--------------------------------------------------------------------------------
-  function test_executeNettedSettlement_NotApproved_Reverts() public {
+  function test_executeSettlementNetted_NotApproved_Reverts() public {
     // Arrange: simple ERC20-only to avoid ETH deposits
     ICore.Flow[] memory flows = new ICore.Flow[](2);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
     flows[1] = _createERC20Flow(bob, charlie, usdc, 50);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("notapproved"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("notapproved"), _getFutureTimestamp(3 days), false, true);
 
     // Only Alice approves; Bob does not
     _approveERC20(alice, usdc, 100);
@@ -157,22 +157,22 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[1] = _createERC20Flow(alice, bob, usdc, 50);
 
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementNotApproved.selector);
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
   //--------------------------------------------------------------------------------
-  // Revert: does not exist / cutoff passed / already executed
+  // Revert: does not exist / cutoff passed / already executed / netoff disabled
   //--------------------------------------------------------------------------------
-  function test_executeNettedSettlement_DoesNotExist_Reverts() public {
+  function test_executeSettlementNetted_DoesNotExist_Reverts() public {
     ICore.Flow[] memory empty;
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
-    dvp.executeNettedSettlement(999, empty);
+    dvp.executeSettlementNetted(999, empty);
   }
 
-  function test_executeNettedSettlement_CutoffPassed_Reverts() public {
+  function test_executeSettlementNetted_CutoffPassed_Reverts() public {
     ICore.Flow[] memory flows = _createERC20Flows();
     uint256 cutoff = _getFutureTimestamp(1);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("cutoff"), cutoff, false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("cutoff"), cutoff, false, true);
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
     _approveERC20(bob, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
@@ -191,13 +191,13 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[1] = _createERC20Flow(bob, alice, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
     vm.expectRevert(DeliveryVersusPaymentV1.CutoffDatePassed.selector);
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeNettedSettlement_AlreadyExecuted_Reverts() public {
+  function test_executeSettlementNetted_AlreadyExecuted_Reverts() public {
     ICore.Flow[] memory flows = _createERC20Flows();
     uint256 cutoff = _getFutureTimestamp(7 days);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("exec_twice"), cutoff, false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("exec_twice"), cutoff, false, true);
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
     _approveERC20(bob, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
@@ -213,20 +213,31 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createERC20Flow(alice, bob, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
     netted[1] = _createERC20Flow(bob, charlie, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
 
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementAlreadyExecuted.selector);
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
+  function test_executeSettlementNetted_NetoffDisabled_Reverts() public {
+    (ICore.Flow[] memory flows, uint256 cutoff, , , ) = _createMixedFlowsForNetting();
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);  // netoff disabled by default
+
+    ICore.Flow[] memory netted = new ICore.Flow[](0);
+    vm.expectRevert(DeliveryVersusPaymentV1.SettlementWithNettedFlowsNotAllowed.selector);
+    dvp.executeSettlementNetted(settlementId, netted);
+
+  }
+
+
   //--------------------------------------------------------------------------------
-  // Validation failures inside executeNettedSettlement
+  // Validation failures inside executeSettlementNetted
   //--------------------------------------------------------------------------------
-  function test_executeNettedSettlement_UnknownPartyInNettedFlow_Reverts() public {
+  function test_executeSettlementNetted_UnknownPartyInNettedFlow_Reverts() public {
     // Original simple
     ICore.Flow[] memory flows = new ICore.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("unknown_party"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("unknown_party"), _getFutureTimestamp(3 days), false, true);
 
     _approveERC20(alice, usdc, 100);
     uint256[] memory ids = _getSettlementIdArray(settlementId);
@@ -237,13 +248,13 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createERC20Flow(alice, dave, usdc, 100);
 
     vm.expectRevert(bytes("Unknown party in netted flow"));
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeNettedSettlement_UnknownAssetInNettedFlow_Reverts() public {
+  function test_executeSettlementNetted_UnknownAssetInNettedFlow_Reverts() public {
     ICore.Flow[] memory flows = new ICore.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("unknown_asset"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("unknown_asset"), _getFutureTimestamp(3 days), false, true);
 
     _approveERC20(alice, usdc, 100);
     uint256[] memory ids = _getSettlementIdArray(settlementId);
@@ -254,13 +265,13 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createERC20Flow(alice, bob, usdt, 100);
 
     vm.expectRevert(bytes("Unknown asset in netted flow"));
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeNettedSettlement_ZeroNettedAmount_Reverts() public {
+  function test_executeSettlementNetted_ZeroNettedAmount_Reverts() public {
     ICore.Flow[] memory flows = new ICore.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("zero_amt"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("zero_amt"), _getFutureTimestamp(3 days), false, true);
 
     _approveERC20(alice, usdc, 100);
     uint256[] memory ids = _getSettlementIdArray(settlementId);
@@ -270,14 +281,14 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createERC20Flow(alice, bob, usdc, 0);
 
     vm.expectRevert(bytes("Zero netted amountOrId"));
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeNettedSettlement_BalanceMismatch_Reverts() public {
+  function test_executeSettlementNetted_BalanceMismatch_Reverts() public {
     // Original: Alice->Bob 100 USDC
     ICore.Flow[] memory flows = new ICore.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("bal_mismatch"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("bal_mismatch"), _getFutureTimestamp(3 days), false, true);
 
     _approveERC20(alice, usdc, 100);
     uint256[] memory ids = _getSettlementIdArray(settlementId);
@@ -288,14 +299,14 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createERC20Flow(alice, bob, usdc, 50);
 
     vm.expectRevert(bytes("Balance mismatch"));
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeNettedSettlement_NFTAssetMustMatchTokenId() public {
+  function test_executeSettlementNetted_NFTAssetMustMatchTokenId() public {
     // Original: Alice -> Bob Daisy (id=1)
     ICore.Flow[] memory flows = new ICore.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
-    uint256 settlementId = dvp.createSettlement(flows, _ref("nft_key"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("nft_key"), _getFutureTimestamp(3 days), false, true);
 
     _approveNFT(alice, nftCat, NFT_CAT_DAISY);
     uint256[] memory ids = _getSettlementIdArray(settlementId);
@@ -307,15 +318,15 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_BUTTONS);
 
     vm.expectRevert(bytes("Unknown asset in netted flow"));
-    dvp.executeNettedSettlement(settlementId, netted);
+    dvp.executeSettlementNetted(settlementId, netted);
   }
 
   //--------------------------------------------------------------------------------
   // Non-payable check: sending value should revert
   //--------------------------------------------------------------------------------
-  function test_executeNettedSettlement_NonPayable_RevertsOnValue() public {
+  function test_executeSettlementNetted_NonPayable_RevertsOnValue() public {
     ICore.Flow[] memory flows = _createERC20Flows();
-    uint256 settlementId = dvp.createSettlement(flows, _ref("nonpayable"), _getFutureTimestamp(3 days), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("nonpayable"), _getFutureTimestamp(3 days), false, true);
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
     _approveERC20(bob, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
@@ -329,7 +340,7 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     netted[1] = _createERC20Flow(bob, alice, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
     // Non-payable function: attempt low-level call with value should fail
-    bytes memory data = abi.encodeWithSelector(DeliveryVersusPaymentV1.executeNettedSettlement.selector, settlementId, netted);
+    bytes memory data = abi.encodeWithSelector(DeliveryVersusPaymentV1.executeSettlementNetted.selector, settlementId, netted);
     (bool ok, ) = address(dvp).call{value: 1 wei}(data);
     assertFalse(ok, "Non-payable function accepted value");
   }

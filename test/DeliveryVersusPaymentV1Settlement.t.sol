@@ -165,7 +165,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     uint256 correctAmount = TOKEN_AMOUNT_SMALL_18_DECIMALS;
     uint256 incorrectAmount = correctAmount / 2;
 
-    vm.expectRevert(DeliveryVersusPaymentV1.IncorrectETHAmount.selector);
+    vm.expectRevert(abi.encodeWithSelector(DeliveryVersusPaymentV1.IncorrectETHAmount.selector, incorrectAmount, correctAmount));
     vm.prank(alice);
     dvp.approveSettlements{value: incorrectAmount}(settlementIds);
   }
@@ -432,6 +432,15 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Non-existent settlement id means revert
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
     dvp.executeSettlement(NOT_A_SETTLEMENT_ID);
+  }
+
+  function test_executeSettlement_WithNettedFlows_Reverts() public {
+    IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
+    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false, true);
+
+    vm.expectRevert(DeliveryVersusPaymentV1.SettlementWithoutNettedFlowsNotAllowed.selector);
+    dvp.executeSettlement(settlementId); // Should revert due to netted flows
   }
 
   function test_executeSettlementInternal_WithExternalCaller_Reverts() public {

@@ -353,28 +353,15 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     this.executeSettlementInner(msg.sender, settlementId);
   }
 
-  /**
-   * @dev Executes a netted version of an existing settlement. Validates that the provided nettedFlows are
-   * equivalent to the originally stored flows for each party and asset (including NFTs treated per-tokenId),
-   * then executes only the netted flows. Uses pre-deposited ETH for ETH legs and refunds any remaining deposits
-   * to all involved parties after execution. NFTs are not netted off-chain in practice, but validation supports
-   * any equivalent decomposition.
-   * @param settlementId The id of the settlement to execute in netted form.
-   * @param nettedFlows The netted set of flows computed off-chain.
-   */
-  function executeSettlementNetted(uint256 settlementId, Flow[] calldata nettedFlows) external nonReentrant {
-    Settlement storage settlement = settlements[settlementId];
-    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    require(settlement.useNettingOff, SettlementWithNettedFlowsNotAllowed());
-    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
-    if (settlement.isSettled) revert SettlementAlreadyExecuted();
-    if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
-
+  function _validateNettedFlows(Flow[] storage originalFlows, Flow[] calldata nettedFlows) internal view returns (
+    uint256 partyCount,
+    address[] memory parties
+  ){
     // Gather unique parties and asset keys from original flows
-    uint256 lengthOriginalFlows = settlement.flows.length;
+    uint256 lengthOriginalFlows = originalFlows.length;
     uint256 maxParties = lengthOriginalFlows * 2;
-    address[] memory parties = new address[](maxParties);
-    uint256 partyCount = 0;
+    parties = new address[](maxParties);
+    partyCount = 0;
 
     uint256 maxKeys = lengthOriginalFlows;
     bytes32[] memory keys = new bytes32[](maxKeys);
@@ -384,22 +371,22 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     bool[] memory isNFTKey = new bool[](maxKeys);
 
     for (uint256 i = 0; i < lengthOriginalFlows; i++) {
-      Flow storage f = settlement.flows[i];
+      Flow storage flow = originalFlows[i];
       // Track parties
-      uint256 idxFrom = _indexOfAddress(parties, partyCount, f.from);
+      uint256 idxFrom = _indexOfAddress(parties, partyCount, flow.from);
       if (idxFrom == type(uint256).max) {
-        parties[partyCount++] = f.from;
+        parties[partyCount++] = flow.from;
       }
-      uint256 idxTo = _indexOfAddress(parties, partyCount, f.to);
+      uint256 idxTo = _indexOfAddress(parties, partyCount, flow.to);
       if (idxTo == type(uint256).max) {
-        parties[partyCount++] = f.to;
+        parties[partyCount++] = flow.to;
       }
       // Track asset keys
-      bytes32 key = _assetKey(f.token, f.isNFT, f.amountOrId);
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
       uint256 keyIdx = _indexOfBytes32(keys, keyCount, key);
       if (keyIdx == type(uint256).max) {
         keys[keyCount] = key;
-        isNFTKey[keyCount] = f.isNFT;
+        isNFTKey[keyCount] = flow.isNFT;
         keyCount++;
       }
     }
@@ -408,8 +395,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     int256[] memory balances = new int256[](partyCount * keyCount);
 
     // Step 1: Apply original flows positively
-    for (uint256 i = 0; i < lengthOriginalFlows; i++) {
-      Flow storage flow = settlement.flows[i];
+    for (uint256 i = 0; i < originalFlows.length; i++) {
+      Flow storage flow = originalFlows[i];
       require(flow.amountOrId > 0, "Zero amountOrId");
 
       bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
@@ -489,6 +476,26 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         }
       }
     }
+  }
+
+  /**
+   * @dev Executes a netted version of an existing settlement. Validates that the provided nettedFlows are
+   * equivalent to the originally stored flows for each party and asset (including NFTs treated per-tokenId),
+   * then executes only the netted flows. Uses pre-deposited ETH for ETH legs and refunds any remaining deposits
+   * to all involved parties after execution. NFTs are not netted off-chain in practice, but validation supports
+   * any equivalent decomposition.
+   * @param settlementId The id of the settlement to execute in netted form.
+   * @param nettedFlows The netted set of flows computed off-chain.
+   */
+  function executeSettlementNetted(uint256 settlementId, Flow[] calldata nettedFlows) external nonReentrant {
+    Settlement storage settlement = settlements[settlementId];
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    require(settlement.useNettingOff, SettlementWithNettedFlowsNotAllowed());
+    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
+    if (settlement.isSettled) revert SettlementAlreadyExecuted();
+    if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
+
+    (uint256 partyCount, address[] memory parties) = _validateNettedFlows(settlement.flows, nettedFlows);
 
     // Step 4: Execute netted flows
     _executeFlowsFromCalldata(settlement, nettedFlows);
@@ -692,7 +699,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       Flow calldata flow = flows[i];
       if (flow.token == address(0)) {
         uint256 amount = flow.amountOrId;
-        require(settlement.ethDeposits[flow.from] >= amount, "Insufficient ETH deposit");
+        if (settlement.ethDeposits[flow.from] < amount) revert IncorrectETHAmount(settlement.ethDeposits[flow.from], amount);
         settlement.ethDeposits[flow.from] -= amount;
         Address.sendValue(payable(flow.to), amount);
       } else {

@@ -439,7 +439,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     uint256 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false, true);
 
-    vm.expectRevert(DeliveryVersusPaymentV1.SettlementWithoutNettedFlowsNotAllowed.selector);
+    vm.expectRevert(DeliveryVersusPaymentV1.SettlementWithNettedFlowsNotAllowed.selector);
     dvp.executeSettlement(settlementId); // Should revert due to netted flows
   }
 

@@ -96,7 +96,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error SettlementDoesNotExist();
   error SettlementNotApproved();
   error SettlementWithNettedFlowsNotAllowed();
-  error SettlementWithoutNettedFlowsNotAllowed();
 
   /**
    * @dev TokenStatus contains an assessment of how ready a party is to settle, for a particular token.
@@ -490,7 +489,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   function executeSettlementNetted(uint256 settlementId, Flow[] calldata nettedFlows) external nonReentrant {
     Settlement storage settlement = settlements[settlementId];
     if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    require(settlement.useNettingOff, SettlementWithNettedFlowsNotAllowed());
     if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
     if (settlement.isSettled) revert SettlementAlreadyExecuted();
     if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
@@ -528,7 +526,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       revert CallerMustBeDvpContract();
     }
     Settlement storage settlement = settlements[settlementId];
-    require(!settlement.useNettingOff, SettlementWithoutNettedFlowsNotAllowed());
+    require(!settlement.useNettingOff, SettlementWithNettedFlowsNotAllowed());
 
     if (settlement.flows.length == 0) revert SettlementDoesNotExist();
     if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();

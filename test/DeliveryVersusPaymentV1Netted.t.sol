@@ -219,16 +219,6 @@ contract DeliveryVersusPaymentV1NettedTest is TestDvpBase {
     dvp.executeSettlementNetted(settlementId, netted);
   }
 
-  function test_executeSettlementNetted_NetoffDisabled_Reverts() public {
-    (ICore.Flow[] memory flows, uint256 cutoff, , , ) = _createMixedFlowsForNetting();
-    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);  // netoff disabled by default
-
-    ICore.Flow[] memory netted = new ICore.Flow[](0);
-    vm.expectRevert(DeliveryVersusPaymentV1.SettlementWithNettedFlowsNotAllowed.selector);
-    dvp.executeSettlementNetted(settlementId, netted);
-
-  }
-
 
   //--------------------------------------------------------------------------------
   // Validation failures inside executeSettlementNetted

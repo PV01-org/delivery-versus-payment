@@ -89,7 +89,9 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
       string memory,
       uint256 _cutoffDate,
       IDeliveryVersusPaymentV1.Flow[] memory flows,
+      IDeliveryVersusPaymentV1.Flow[] memory,
       bool _isSettled,
+      bool,
       bool
     ) {
       exists = true;

@@ -215,6 +215,49 @@ contract TestDvpBase is Test {
     return flows;
   }
 
+  // Helper to create mixed flows (ERC20 + ETH + NFT) for netting
+  function _createMixedFlowsForNetting()
+    internal
+    view
+    returns (IDeliveryVersusPaymentV1.Flow[] memory flows, IDeliveryVersusPaymentV1.Flow[] memory nettedFlows, uint256 cutoff, uint256 ethA, uint256 ethB, uint256 ethC)
+  {
+    // Original flows (6 total):
+    // ETH:  A->B 10e18, B->C 4e18, C->A 3e18
+    // USDC: A->C 50,      C->B 20
+    // NFT:  A->C Cat Daisy (id=1)
+    flows = new IDeliveryVersusPaymentV1.Flow[](6);
+    uint256 tenEth = TOKEN_AMOUNT_SMALL_18_DECIMALS; // 40e18 from base, but we want explicit 10e18 here.
+    // Adjust: Use fixed values for clarity
+    tenEth = 10 ether;
+
+    flows[0] = _createETHFlow(alice, bob, tenEth);
+    flows[1] = _createETHFlow(bob, charlie, 4 ether);
+    flows[2] = _createETHFlow(charlie, alice, 3 ether);
+
+    flows[3] = _createERC20Flow(alice, charlie, usdc, 50);
+    flows[4] = _createERC20Flow(charlie, bob, usdc, 20);
+
+    flows[5] = _createNFTFlow(alice, charlie, nftCat, NFT_CAT_DAISY);
+
+    // Build netted flows (equivalent):
+    // ETH nets to: A->C 7, B->C 4
+    // USDC nets to: A->B 20, A->C 30
+    // NFT unchanged: A->C Daisy
+    nettedFlows = new IDeliveryVersusPaymentV1.Flow[](5);
+    nettedFlows[0] = _createETHFlow(alice, bob, 6 ether);
+    nettedFlows[1] = _createETHFlow(alice, charlie, 1 ether);
+    nettedFlows[2] = _createERC20Flow(alice, bob, usdc, 20);
+    nettedFlows[3] = _createERC20Flow(alice, charlie, usdc, 30);
+    nettedFlows[4] = _createNFTFlow(alice, charlie, nftCat, NFT_CAT_DAISY);
+
+    cutoff = _getFutureTimestamp(7 days);
+
+    // ETH deposits required per original
+    ethA = 7 ether; // A must deposit 7 ether
+    ethB = 0 ether; // B must deposit 0 ether
+    ethC = 0 ether; // C must deposit 0 ether
+  }
+
   // Helper to approve ERC20 tokens for DVP
   function _approveERC20(address owner, address token, uint256 amount) internal {
     vm.prank(owner);

@@ -41,8 +41,10 @@ interface IDeliveryVersusPaymentV1 {
    * @return settlementReference A free-text reference.
    * @return cutoffDate The settlement's cutoff date.
    * @return flows An array of flows contained in the settlement.
+   * @return nettedFlows An array of netted flows provided to the settlement upon creation.
    * @return isSettled True if the settlement has been executed.
    * @return isAutoSettled True if the settlement is set for auto-settlement.
+   * @return useNettingOff True if the settlement uses netting-off.
    */
   function getSettlement(
     uint256 settlementId
@@ -53,7 +55,9 @@ interface IDeliveryVersusPaymentV1 {
       string memory settlementReference,
       uint256 cutoffDate,
       Flow[] memory flows,
+      Flow[] memory nettedFlows,
       bool isSettled,
-      bool isAutoSettled
+      bool isAutoSettled,
+      bool useNettingOff
     );
 }

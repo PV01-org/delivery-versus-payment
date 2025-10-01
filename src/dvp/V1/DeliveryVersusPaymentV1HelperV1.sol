@@ -149,23 +149,22 @@ contract DeliveryVersusPaymentV1HelperV1 {
   ) external view returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
     IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
     // Retrieve flows (bubble up any revert from DVP)
-    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(settlementId);
-    return computeNettedFlows(dvpAddress, flows);
+    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(settlementId);
+    return this.computeNettedFlows(flows);
   }
+
   /**
    * @dev Computes an optimized netted array of flows from the given flows.
    * This function minimizes fungible transfers per token (including ETH) by netting balances per party
    * and pairing debtors and creditors greedily. NFTs are handled per tokenId with at most one transfer.
    *
-   * @param dvpAddress The address of the Delivery Versus Payment contract.
    * @param flows An array of flows to be optimized into a netted execution plan.
    *
    * @return netted An array of flows representing a netted execution plan equivalent to the original.
    */
   function computeNettedFlows(
-    address dvpAddress,
     IDeliveryVersusPaymentV1.Flow[] memory flows
-  ) external view returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
+  ) external pure returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
     uint256 lengthFlows = flows.length;
     // Upper bound for netted flows is original length
     netted = new IDeliveryVersusPaymentV1.Flow[](lengthFlows);
@@ -289,6 +288,8 @@ contract DeliveryVersusPaymentV1HelperV1 {
         string memory,
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
+        IDeliveryVersusPaymentV1.Flow[] memory,
+        bool,
         bool,
         bool
       ) {
@@ -348,6 +349,8 @@ contract DeliveryVersusPaymentV1HelperV1 {
         string memory,
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
+        IDeliveryVersusPaymentV1.Flow[] memory,
+        bool,
         bool,
         bool
       ) {

@@ -108,7 +108,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement includes at least one flow with token == usdc
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasUSDC = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == usdc) {
@@ -185,7 +185,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement involves Bob
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
       bool involvesBob = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].from == bob || flows[j].to == bob) {
@@ -230,7 +230,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one Ether flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasEtherFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == address(0)) {
@@ -255,7 +255,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one ERC20 flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasERC20Flow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && !flows[j].isNFT) {
@@ -280,7 +280,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one NFT flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , ,) = dvp.getSettlement(returnedIds[i]);
       bool hasNFTFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && flows[j].isNFT) {
@@ -496,14 +496,33 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   //--------------------------------------------------------------------------------
   // computeNettedFlows Tests
   //--------------------------------------------------------------------------------
-  function test_computeNettedFlows_ERC20Chain_GeneratesMinimalAndExecutes() public {
+  function test_computeNettedFlows_ERC20Chain_GeneratesMinimalAndCreatesAndExecutes() public {
     // Create a settlement with a USDC chain that nets down
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
     flows[0] = _createERC20Flow(alice, bob, usdc, 100);
     flows[1] = _createERC20Flow(bob, charlie, usdc, 70);
     flows[2] = _createERC20Flow(charlie, alice, usdc, 20);
 
-    uint256 settlementId = dvp.createSettlement(flows, "USDC chain", _getFutureTimestamp(7 days), false, true);
+    // Generate minimal netted flows via helper
+    IDeliveryVersusPaymentV1.Flow[] memory netted = dvpHelper.computeNettedFlows(flows);
+
+    // Expect 2 netted transfers: Alice->Bob 30, Alice->Charlie 50 (order is deterministic by helper)
+    assertEq(netted.length, 2, "Expected two netted flows for USDC");
+    assertEq(netted[0].token, usdc);
+    assertFalse(netted[0].isNFT);
+    assertEq(netted[0].from, alice);
+    assertEq(netted[0].to, bob);
+    assertEq(netted[0].amountOrId, 30);
+
+    assertEq(netted[1].token, usdc);
+    assertFalse(netted[1].isNFT);
+    assertEq(netted[1].from, alice);
+    assertEq(netted[1].to, charlie);
+    assertEq(netted[1].amountOrId, 50);
+
+
+    // Create settlement with netted flows, this will run the validation
+    uint256 settlementId = dvp.createSettlement(flows, netted, "USDC chain", _getFutureTimestamp(7 days), false);
 
     // Approvals (allowances for ERC20 and DVP approvals by from-parties)
     _approveERC20(alice, usdc, 100);
@@ -520,29 +539,12 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     assertTrue(dvp.isSettlementApproved(settlementId));
 
-    // Compute netted flows via helper
-    IDeliveryVersusPaymentV1.Flow[] memory netted = dvpHelper.computeNettedFlows(address(dvp), settlementId);
-
-    // Expect 2 netted transfers: Alice->Bob 30, Alice->Charlie 50 (order is deterministic by helper)
-    assertEq(netted.length, 2, "Expected two netted flows for USDC");
-    assertEq(netted[0].token, usdc);
-    assertFalse(netted[0].isNFT);
-    assertEq(netted[0].from, alice);
-    assertEq(netted[0].to, bob);
-    assertEq(netted[0].amountOrId, 30);
-
-    assertEq(netted[1].token, usdc);
-    assertFalse(netted[1].isNFT);
-    assertEq(netted[1].from, alice);
-    assertEq(netted[1].to, charlie);
-    assertEq(netted[1].amountOrId, 50);
-
     // Snapshot balances and execute
     uint256 aBefore = AssetToken(usdc).balanceOf(alice);
     uint256 bBefore = AssetToken(usdc).balanceOf(bob);
     uint256 cBefore = AssetToken(usdc).balanceOf(charlie);
 
-    dvp.executeSettlementNetted(settlementId, netted);
+    dvp.executeSettlement(settlementId);
 
     // Check net deltas: Alice -80, Bob +30, Charlie +50
     assertEq(AssetToken(usdc).balanceOf(alice), aBefore - 80);
@@ -550,7 +552,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     assertEq(AssetToken(usdc).balanceOf(charlie), cBefore + 50);
 
     // isSettled set
-    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    (, , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 

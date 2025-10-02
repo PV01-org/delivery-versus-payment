@@ -446,4 +446,32 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     assertEq(dvp.settlementIdCounter(), settlementId);
   }
+
+  function test_createSettlement_WithVeryBigAmount_Reverts() public {
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createETHFlow(alice, bob, type(uint256).max);
+
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlowsUnused = new IDeliveryVersusPaymentV1.Flow[](1);
+    nettedFlowsUnused[0] = _createETHFlow(alice, bob, type(uint256).max);
+
+    uint256 cutoff = _getFutureTimestamp(7 days);
+
+    vm.expectRevert(abi.encodeWithSelector(DeliveryVersusPaymentV1.AmountOrIdTooLarge.selector, type(uint256).max, -1));
+    dvp.createSettlement(flows, nettedFlowsUnused, SETTLEMENT_REF, cutoff, false);
+  }
+
+  function test_createSettlement_Overflow_Reverts() public {
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createETHFlow(alice, bob, 5);
+
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlowsUnused = new IDeliveryVersusPaymentV1.Flow[](3);
+    nettedFlowsUnused[0] = _createETHFlow(alice, bob, uint256(type(int256).max));
+    nettedFlowsUnused[1] = _createETHFlow(alice, bob, uint256(type(int256).max));
+    nettedFlowsUnused[2] = _createETHFlow(alice, bob, 6);
+
+    uint256 cutoff = _getFutureTimestamp(7 days);
+
+    vm.expectRevert(bytes("panic: arithmetic underflow or overflow (0x11)"));
+    dvp.createSettlement(flows, nettedFlowsUnused, SETTLEMENT_REF, cutoff, false);
+  }
 }

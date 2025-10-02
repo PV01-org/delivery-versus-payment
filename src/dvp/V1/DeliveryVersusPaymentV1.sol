@@ -97,6 +97,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error SettlementNotApproved();
   error NotEquivalentNettedFlows();
   error ZeroNettedAmountOrId();
+  error AmountOrIdTooLarge(uint256 amountOrId, int256 delta);
   error UnknownPartyInNettedFlow();
   error UnknownAssetInNettedFlow();
 
@@ -562,6 +563,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       uint256 pTo = _indexOfAddress(parties, partyCount, flow.to);
 
       int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
       uint256 idxA = k * partyCount + pFrom;
       uint256 idxB = k * partyCount + pTo;
       balances[idxA] -= delta;
@@ -595,6 +597,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       require(k != type(uint256).max, UnknownAssetInNettedFlow());
 
       int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
       uint256 idxA = k * partyCount + pFrom;
       uint256 idxB = k * partyCount + pTo;
       balances[idxA] += delta; // flip signs compared to originals

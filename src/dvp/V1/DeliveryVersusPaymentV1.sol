@@ -564,10 +564,10 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
 
       int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
       require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
-      uint256 idxA = k * partyCount + pFrom;
-      uint256 idxB = k * partyCount + pTo;
-      balances[idxA] -= delta;
-      balances[idxB] += delta;
+      uint256 idxFrom = k * partyCount + pFrom;
+      uint256 idxTo = k * partyCount + pTo;
+      balances[idxFrom] -= delta;
+      balances[idxTo] += delta;
     }
 
     // Preserve original net deltas for fungible funding/allowance checks
@@ -598,15 +598,15 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
 
       int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
       require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
-      uint256 idxA = k * partyCount + pFrom;
-      uint256 idxB = k * partyCount + pTo;
-      balances[idxA] += delta; // flip signs compared to originals
-      balances[idxB] -= delta;
+      uint256 idxFrom = k * partyCount + pFrom;
+      uint256 idxTo = k * partyCount + pTo;
+      balances[idxFrom] += delta; // flip signs compared to originals
+      balances[idxTo] -= delta;
 
       // Track gross movements for fungibles (ETH/ERC20) to enforce net-only funding/allowances
       if (!flow.isNFT) {
-        grossOut[idxA] += uint256(delta);
-        grossIn[idxB] += uint256(delta);
+        grossOut[idxFrom] += uint256(delta);
+        grossIn[idxTo] += uint256(delta);
       }
     }
 

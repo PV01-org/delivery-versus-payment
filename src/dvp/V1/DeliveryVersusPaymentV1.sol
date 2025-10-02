@@ -570,16 +570,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       balances[idxTo] += delta;
     }
 
-    // Preserve original net deltas for fungible funding/allowance checks
-    int256[] memory netDeltas = new int256[](partyCount * keyCount);
-    for (uint256 idx = 0; idx < netDeltas.length; idx++) {
-      netDeltas[idx] = balances[idx];
-    }
-
-    // Accumulate gross in/out for fungibles in provided netted plan
-    uint256[] memory grossOut = new uint256[](partyCount * keyCount);
-    uint256[] memory grossIn = new uint256[](partyCount * keyCount);
-
     // Step 2: Apply netted flows with flipped signs (subtract netted effect)
     uint256 lengthNettedFlows = nettedFlows.length;
     for (uint256 i = 0; i < lengthNettedFlows; i++) {
@@ -602,12 +592,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       uint256 idxTo = k * partyCount + pTo;
       balances[idxFrom] += delta; // flip signs compared to originals
       balances[idxTo] -= delta;
-
-      // Track gross movements for fungibles (ETH/ERC20) to enforce net-only funding/allowances
-      if (!flow.isNFT) {
-        grossOut[idxFrom] += uint256(delta);
-        grossIn[idxTo] += uint256(delta);
-      }
     }
 
     // Step 3: Validate all balances are zero (equivalence)
@@ -617,26 +601,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       }
     }
 
-    // Additional Step: For fungible assets, enforce debtor→creditor-only transfers with gross == net per party
-    // TODO: evaluate whether this is too restrictive, this would possibly prevent partial netting arrangements, write tests for this in case we decide to keep it
-    for (uint256 k = 0; k < keyCount; k++) {
-      if (isNFTKey[k]) continue; // skip NFTs
-      for (uint256 p = 0; p < partyCount; p++) {
-        uint256 base = k * partyCount + p;
-        int256 d = netDeltas[base];
-        uint256 go = grossOut[base];
-        uint256 gi = grossIn[base];
-        if (d < 0) {
-          require(gi == 0, "Fungible: debtor must not receive");
-          require(go == uint256(-d), "Fungible: debtor must send exactly net");
-        } else if (d > 0) {
-          require(go == 0, "Fungible: creditor must not send");
-          require(gi == uint256(d), "Fungible: creditor must receive exactly net");
-        } else {
-          require(go == 0 && gi == 0, "Fungible: zero-net party must not move");
-        }
-      }
-    }
   }
 
   // Executes flows stored in settlement.flows or settlement.nettedFlows

@@ -175,6 +175,24 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     dvp.createSettlement(flows, netted, _ref("zero_amt"), _getFutureTimestamp(3 days), false);
   }
 
+  function test_createSettlement_ZeroIdNFT_Succeeds() public {
+    // Original: Alice->Bob Cat (id=0)
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createNFTFlow(alice, bob, nftCat, 0);
+
+    // Netted: Alice->Bob Cat (id=0)
+    IDeliveryVersusPaymentV1.Flow[] memory netted = new IDeliveryVersusPaymentV1.Flow[](1);
+    netted[0] = _createNFTFlow(alice, bob, nftCat, 0);
+
+    uint256 settlementId = dvp.createSettlement(flows, netted, _ref("zero_nft_id"), _getFutureTimestamp(3 days), false);
+
+    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , , ) = dvp.getSettlement(settlementId);
+    assertEq(retrievedFlows.length, 1);
+    assertEq(retrievedNettedFlows.length, 1);
+    assertEq(retrievedFlows[0].amountOrId, 0);
+    assertEq(retrievedNettedFlows[0].amountOrId, 0);
+  }
+
   function test_createSettlement_BalanceMismatch_Reverts() public {
     // Original: Alice->Bob 100 USDC
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);

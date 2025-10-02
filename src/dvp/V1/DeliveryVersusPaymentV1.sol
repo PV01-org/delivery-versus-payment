@@ -584,7 +584,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     uint256 lengthNettedFlows = nettedFlows.length;
     for (uint256 i = 0; i < lengthNettedFlows; i++) {
       Flow memory flow = nettedFlows[i];
-      require(flow.amountOrId > 0, ZeroNettedAmountOrId());
+      require(flow.isNFT || flow.amountOrId > 0, ZeroNettedAmountOrId());
 
       // Both parties must be from original settlement
       uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);

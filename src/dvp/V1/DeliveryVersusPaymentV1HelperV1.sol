@@ -433,6 +433,9 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 ni = 0;
     uint256 pj = 0;
 
+
+    // Split into negative and positive balances
+    // and record indices of parties so we can create the flows later
     for (uint256 p = 0; p < partyCount; p++) {
       int256 b = balances[baseIndex + p];
       if (b < 0) {
@@ -445,6 +448,24 @@ contract DeliveryVersusPaymentV1HelperV1 {
         pj++;
       }
     }
+    /**
+     * Greedily match negative and positive balances
+     * This is not guaranteed to produce the minimal number of transfers in all cases,
+     * but it is simple and typically produces good results.
+     * For best possible optimization (e.g., strictly minimal number of transfers across complex graphs),
+     * we suggest computing netting off-chain using a MILP/LP solver and then submitting
+     * the result to createSettlement.
+     *
+     * Here is how the greedy algorithm works:
+     * - We have two lists: one of parties with negative balances (debtors) and one of parties with positive balances (creditors).
+     * - We iterate through both lists, matching debtors to creditors.
+     * - For each match, we create a flow for the minimum of the debtor's negative
+     * and creditor's positive balance. We then adjust the balances accordingly.
+     * - If a debtor's balance is fully settled, we move to the next debtor.
+     * - If a creditor's balance is fully settled, we move to the next creditor.
+     * - This continues until all debtors or all creditors are settled.
+     *
+     */
 
     uint256 iNeg = 0;
     uint256 jPos = 0;

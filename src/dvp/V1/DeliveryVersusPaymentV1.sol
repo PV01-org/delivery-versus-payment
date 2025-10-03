@@ -300,7 +300,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     uint256 cutoffDate,
     bool isAutoSettled
   ) external returns (uint256 id) {
-    return _createSettlement(flows, nettedFlows,settlementReference, cutoffDate, isAutoSettled, true);
+    return _createSettlement(flows, nettedFlows, settlementReference, cutoffDate, isAutoSettled, true);
   }
 
   /**
@@ -333,6 +333,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementReference A free text reference for the settlement.
    * @param cutoffDate The deadline for approvals and execution.
    * @param isAutoSettled If true, the settlement will be executed automatically after all approvals are in place.
+   * @param useNettingOff If true, the settlement will use netting off with the provided nettedFlows.
    */
   function _createSettlement(
     Flow[] calldata flows,
@@ -347,6 +348,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     if (lengthFlows == 0) revert NoFlowsProvided();
     // no need to check for nettedFlows being not empty if useNettingOff is false at runtime
     // as useNettingOff is not an external input and we fully control the value for it.
+    // Also an empty nettedFlows array is valid if all flows are zero-sum.
 
     // Validate flows
     for (uint256 i = 0; i < lengthFlows; i++) {

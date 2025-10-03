@@ -126,7 +126,7 @@ It is acknowledged that bad actors could be annoying by creating flows with fake
 ### Reentrancy Protection
 Settlement approval can be done in batches. Settlement execution can potentially be triggered inside that (if auto-settle is switched on and a party is giving the final approval). Settlement execution can make many external calls to process transfers of assets. These patterns lend themselves well to reentrancy, which is protected against as follows:
 
-| Function             | Reentrancy Protection     | 
+| Function             | Reentrancy Protection     |
 |----------------------|---------------------------|
 | approveSettlements() | OZ nonReentrant modifer   |
 | createSettlement()   | No external calls made    |

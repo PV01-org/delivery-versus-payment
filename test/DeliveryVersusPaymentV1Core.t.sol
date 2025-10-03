@@ -47,7 +47,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , bool isSettled, bool isAutoSettled) = dvp.getSettlement(settlementId);
+    (,,, bool isSettled, bool isAutoSettled) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
   }

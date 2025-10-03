@@ -2,14 +2,13 @@
 pragma solidity 0.8.30;
 
 /**
-██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
-██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
-██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
-██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
-██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
-╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
+ * ██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
+ * ██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
+ * ██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
+ * ██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
+ * ██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
+ * ╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
  */
-
 import {Address} from "@openzeppelin/contracts-v5-2-0/utils/Address.sol";
 import {ERC165Checker} from "@openzeppelin/contracts-v5-2-0/utils/introspection/ERC165Checker.sol";
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
@@ -75,7 +74,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   event SettlementCreated(uint256 indexed settlementId, address indexed creator);
   event SettlementExecuted(uint256 indexed settlementId, address indexed executor);
   event SettlementAutoExecutionFailedReason(uint256 indexed settlementId, address indexed executor, string reason);
-  event SettlementAutoExecutionFailedPanic(uint256 indexed settlementId, address indexed executor, uint errorCode);
+  event SettlementAutoExecutionFailedPanic(uint256 indexed settlementId, address indexed executor, uint256 errorCode);
   event SettlementAutoExecutionFailedOther(uint256 indexed settlementId, address indexed executor, bytes lowLevelData);
   event SettlementApprovalRevoked(uint256 indexed settlementId, address indexed party);
 
@@ -124,6 +123,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     bool isSettled;
     bool isAutoSettled;
   }
+
   mapping(uint256 => Settlement) private settlements;
 
   /// @dev Last settlement id used
@@ -223,7 +223,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         } catch Error(string memory reason) {
           // Revert with reason string
           emit SettlementAutoExecutionFailedReason(settlementId, msg.sender, reason);
-        } catch Panic(uint errorCode) {
+        } catch Panic(uint256 errorCode) {
           // Revert due to serious error (eg division by zero)
           emit SettlementAutoExecutionFailedPanic(settlementId, msg.sender, errorCode);
         } catch (bytes memory lowLevelData) {
@@ -326,9 +326,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @dev Retrieves settlement details.
    * @param settlementId The id of the settlement to retrieve.
    */
-  function getSettlement(
-    uint256 settlementId
-  )
+  function getSettlement(uint256 settlementId)
     external
     view
     returns (
@@ -365,10 +363,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementId The id of the settlement to check.
    * @param party The party to check.
    */
-  function getSettlementPartyStatus(
-    uint256 settlementId,
-    address party
-  )
+  function getSettlementPartyStatus(uint256 settlementId, address party)
     external
     view
     returns (bool isApproved, uint256 etherRequired, uint256 etherDeposited, TokenStatus[] memory tokenStatuses)
@@ -463,10 +458,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @return etherRequired The total ETH required from the party.
    * @return etherDeposited The total ETH deposited by the party.
    */
-  function _getPartyEthStats(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (uint256 etherRequired, uint256 etherDeposited) {
+  function _getPartyEthStats(Settlement storage settlement, address party)
+    internal
+    view
+    returns (uint256 etherRequired, uint256 etherDeposited)
+  {
     uint256 lengthFlows = settlement.flows.length;
     for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage flow = settlement.flows[i];
@@ -485,10 +481,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -503,10 +496,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           tokenAddress: f.token,
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
-          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this) ||
-            nft.isApprovedForAll(party, address(this))
-            ? f.amountOrId
-            : 0,
+          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
+            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {

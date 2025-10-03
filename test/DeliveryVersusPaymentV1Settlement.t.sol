@@ -32,10 +32,8 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement party status for Alice
-    (bool isApproved, uint256 etherRequired, uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (bool isApproved, uint256 etherRequired, uint256 etherDeposited,) =
+      dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertTrue(isApproved);
     assertEq(etherRequired, 0);
@@ -62,10 +60,8 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements{value: aliceETHRequired}(settlementIds);
 
     // Check Alice's status
-    (bool isApproved, uint256 etherRequired, uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (bool isApproved, uint256 etherRequired, uint256 etherDeposited,) =
+      dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertTrue(isApproved);
     assertEq(etherRequired, aliceETHRequired);
@@ -232,7 +228,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is not executed yet
-    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
 
     // Bob approves last - triggers auto-execution
@@ -242,7 +238,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is executed
-    (, , , isSettled, ) = dvp.getSettlement(settlementId);
+    (,,, isSettled,) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -262,7 +258,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.prank(dave);
     dvp.approveSettlements(settlementIds);
 
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, dave);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, dave);
     assertTrue(isApproved, "Approval should still be retained after auto-execution failure");
   }
 
@@ -282,7 +278,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.prank(dave);
     dvp.approveSettlements(settlementIds);
 
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, dave);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, dave);
     assertTrue(isApproved, "Approval should still be retained after auto-execution failure");
   }
 
@@ -323,7 +319,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     assertEq(daiToken.balanceOf(charlie), charlieDAIBefore + TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
     // Check settlement is marked as settled
-    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -458,7 +454,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements{value: aliceETHRequired}(settlementIds);
 
     // Verify approval and deposit
-    (bool isApproved, , uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved,, uint256 etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
     assertEq(etherDeposited, aliceETHRequired);
 
@@ -471,7 +467,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.revokeApprovals(settlementIds);
 
     // Check approval is revoked and ETH refunded
-    (isApproved, , etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (isApproved,, etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertFalse(isApproved);
     assertEq(etherDeposited, 0);
     assertEq(alice.balance, aliceETHBefore); // Should get ETH back (minus gas)
@@ -544,7 +540,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.withdrawETH(settlementId);
 
     // Check ETH is returned
-    (, , uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (,, uint256 etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertEq(etherDeposited, 0);
   }
 

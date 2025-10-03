@@ -7,8 +7,9 @@ import {ERC20} from "@openzeppelin/contracts-v5-2-0/token/ERC20/ERC20.sol";
 /// @dev Mock ERC20 token that does various flavours of revert on transferFrom based on the amount.
 contract AssetTokenThatReverts is ERC20 {
   uint8 private _decimals;
-  uint private dummy;
+  uint256 private dummy;
   // Error selector 0x0a59c53c
+
   error ThisIsACustomError();
 
   constructor(string memory name_, string memory symbol_, uint8 decimals_) ERC20(name_, symbol_) {
@@ -31,7 +32,7 @@ contract AssetTokenThatReverts is ERC20 {
       revert ThisIsACustomError();
     } else if (amount == 3) {
       // Revert with panic divide by zero
-      uint i = 10;
+      uint256 i = 10;
       dummy = i / (i - 10);
       return false;
     } else {

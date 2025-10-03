@@ -17,6 +17,7 @@ contract MaliciousActorDVP {
     ExecuteSettlement,
     RevokeApproval
   }
+
   ReentrancyMode private reentrancyMode;
 
   constructor(IDeliveryVersusPaymentV1 _dvp) {

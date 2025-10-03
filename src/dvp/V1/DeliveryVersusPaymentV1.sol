@@ -84,6 +84,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error ApprovalNotGranted();
   error CallerNotInvolved();
   error CallerMustBeDvpContract();
+  error CallerMustBeSettlementCreator();
   error CannotSendEtherDirectly();
   error CutoffDateNotPassed();
   error CutoffDatePassed();
@@ -127,6 +128,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     Flow[] nettedFlows;
     mapping(address => bool) approvals;
     mapping(address => uint256) ethDeposits;
+    address creatorAddress;
     bool isSettled;
     bool isAutoSettled;
     bool useNettingOff;
@@ -237,8 +239,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     ethAmountRequired = 0;
     isInvolved = false;
     uint256 lengthFlows = flows.length;
-    for (uint256 j = 0; j < lengthFlows; j++) {
-      Flow storage flow = flows[j];
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      Flow storage flow = flows[i];
       if (flow.from == party || flow.to == party) {
         isInvolved = true;
       }
@@ -246,6 +248,37 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         ethAmountRequired += flow.amountOrId;
       }
     }
+  }
+
+
+  /**
+   * @dev Sets the netted flows for a given settlement. This function allows the creator of the settlement
+   * to provide an optimized set of flows (nettedFlows) that will be used for processing the settlement.
+   * Reverts if:
+   * - The settlement does not exist.
+   * - The settlement has already been executed.
+   * - The current time is past the settlement's cutoff date.
+   * - The caller is not the creator of the settlement.
+   * - The provided netted flows are not equivalent to the original flows in terms of total amounts per party and asset.
+   *
+   * @param settlementId The ID of the settlement to update.
+   * @param nettedFlows The optimized set of flows to be used for the settlement.
+   */
+  function setNettedFlows(uint256 settlementId, Flow[] calldata nettedFlows) external {
+    Settlement storage settlement = settlements[settlementId];
+
+    // Revert if the settlement does not exist (no flows defined).
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    if (settlement.isSettled) revert SettlementAlreadyExecuted();
+    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
+    if (msg.sender != settlement.creatorAddress) revert CallerMustBeSettlementCreator();
+
+    // Validate the equivalence of the original flows and the provided netted flows.
+    _validateNettedFlows(settlement.flows, nettedFlows);
+
+    // Update the settlement with the netted flows and enable netting off.
+    settlement.nettedFlows = nettedFlows;
+    settlement.useNettingOff = true;
   }
 
   /**
@@ -329,6 +362,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     // Store new settlement
     id = ++settlementIdCounter;
     Settlement storage settlement = settlements[id];
+    settlement.creatorAddress = msg.sender;
     settlement.settlementReference = settlementReference;
     settlement.cutoffDate = cutoffDate;
     settlement.isAutoSettled = isAutoSettled;
@@ -384,6 +418,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       uint256 cutoffDate,
       Flow[] memory flows,
       Flow[] memory nettedFlows,
+      address creatorAddress,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff
@@ -396,6 +431,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       settlement.cutoffDate,
       settlement.flows,
       settlement.nettedFlows,
+      settlement.creatorAddress,
       settlement.isSettled,
       settlement.isAutoSettled,
       settlement.useNettingOff
@@ -513,7 +549,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   // Validate whether original flows and netted flows are equivalent.
   // Reverts if not equivalent
   // Returns partyCount and array of unique parties (length = partyCount) for convenience.
-  function _validateNettedFlows(Flow[] calldata originalFlows, Flow[] memory nettedFlows) internal pure returns (
+  function _validateNettedFlows(Flow[] memory originalFlows, Flow[] memory nettedFlows) internal pure returns (
     uint256 partyCount,
     address[] memory parties
   ){
@@ -531,7 +567,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     bool[] memory isNFTKey = new bool[](maxKeys);
 
     for (uint256 i = 0; i < lengthOriginalFlows; i++) {
-      Flow calldata flow = originalFlows[i];
+      Flow memory flow = originalFlows[i];
       // Track parties
       uint256 idxFrom = _indexOfAddress(parties, partyCount, flow.from);
       if (idxFrom == type(uint256).max) {
@@ -556,7 +592,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
 
     // Step 1: Apply original flows positively
     for (uint256 i = 0; i < originalFlows.length; i++) {
-      Flow calldata flow = originalFlows[i];
+      Flow memory flow = originalFlows[i];
       bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
       uint256 k = _indexOfBytes32(keys, keyCount, key);
       uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);

@@ -149,7 +149,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
   ) external view returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
     IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
     // Retrieve flows (bubble up any revert from DVP)
-    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(settlementId);
+    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(settlementId);
     return this.computeNettedFlows(flows);
   }
 
@@ -289,6 +289,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
         IDeliveryVersusPaymentV1.Flow[] memory,
+        address,
         bool,
         bool,
         bool
@@ -350,6 +351,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
         IDeliveryVersusPaymentV1.Flow[] memory,
+        address,
         bool,
         bool,
         bool

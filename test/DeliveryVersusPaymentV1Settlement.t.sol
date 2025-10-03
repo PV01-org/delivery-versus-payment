@@ -232,7 +232,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is not executed yet
-    (, , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
 
     // Bob approves last - triggers auto-execution
@@ -242,7 +242,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is executed
-    (, , , , isSettled, , ) = dvp.getSettlement(settlementId);
+    (, , , , , isSettled, , ) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -323,7 +323,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     assertEq(daiToken.balanceOf(charlie), charlieDAIBefore + TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
     // Check settlement is marked as settled
-    (, , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -447,7 +447,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     assertEq(ethDepC, 0);
 
     // isSettled
-    (, , , , bool isSettled,,  ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -669,4 +669,136 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.prank(alice);
     dvp.withdrawETH(settlementId);
   }
+
+  function test_setNettedFlows_Success() public {
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows;
+    bool useNettingOff;
+
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    uint256 settlementId = dvp.createSettlement(flows, _ref('set_netted_flows'), _getFutureTimestamp(1), false);
+
+    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+
+    assertEq(nettedFlows.length, 0);
+    assertFalse(useNettingOff);
+
+    nettedFlows = new IDeliveryVersusPaymentV1.Flow[](1);
+    nettedFlows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    // Act
+    dvp.setNettedFlows(settlementId, nettedFlows);
+
+    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+
+    // Assert
+    assertEq(nettedFlows.length, 1);
+    assertTrue(useNettingOff);
+  }
+
+  function test_setNettedFlows_CalledMultipleTimesSuccess() public {
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows;
+    bool useNettingOff;
+
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 10);
+    flows[1] = _createERC20Flow(alice, bob, usdc, 20);
+    flows[2] = _createERC20Flow(alice, bob, usdc, 40);
+
+    uint256 settlementId = dvp.createSettlement(flows, _ref('set_netted_flows'), _getFutureTimestamp(1), false);
+
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows1 = new IDeliveryVersusPaymentV1.Flow[](2);
+    nettedFlows1[0] = _createERC20Flow(alice, bob, usdc, 50);
+    nettedFlows1[1] = _createERC20Flow(alice, bob, usdc, 20);
+
+    dvp.setNettedFlows(settlementId, nettedFlows1);
+
+    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+
+    assertEq(nettedFlows.length, 2);
+    assertTrue(useNettingOff);
+
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows2 = new IDeliveryVersusPaymentV1.Flow[](1);
+    nettedFlows2[0] = _createERC20Flow(alice, bob, usdc, 70);
+
+    dvp.setNettedFlows(settlementId, nettedFlows2);
+
+    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+
+    assertEq(nettedFlows.length, 1);
+    assertTrue(useNettingOff);
+  }
+
+  function test_setNettedFlows_RevertsIfSettlementDoesNotExist() public {
+      // Arrange
+      IDeliveryVersusPaymentV1.Flow[] memory nettedFlows = new IDeliveryVersusPaymentV1.Flow[](1);
+      nettedFlows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+      // Act & Assert
+      vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
+      dvp.setNettedFlows(1, nettedFlows);  // No settlement with ID 1
+  }
+
+  function test_setNettedFlows_RevertsIfSettlementAlreadyExecuted() public {
+    // Arrange
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("already_executed"), cutoff, false);
+
+    _approveERC20(alice, usdc, 20);
+    vm.prank(alice);
+    dvp.approveSettlements(_getSettlementIdArray(settlementId));
+    dvp.executeSettlement(settlementId);
+
+    // Act & Assert
+    vm.expectRevert(DeliveryVersusPaymentV1.SettlementAlreadyExecuted.selector);
+    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+  }
+
+  function test_setNettedFlows_RevertsIfCutoffDatePassed() public {
+    // Arrange
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    uint256 cutoff = _getFutureTimestamp(1 days);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("cutoff_passed"), cutoff, false);
+
+    // Act & Assert
+    _advanceTime(2 days);
+    vm.expectRevert(DeliveryVersusPaymentV1.CutoffDatePassed.selector);
+    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+  }
+//
+  function test_setNettedFlows_revertsIfCallerIsNotCreator() public {
+    // Arrange
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("caller_not_creator"), cutoff, false);
+
+    // Act & Assert
+    vm.prank(bob); // Bob is not the creator
+    vm.expectRevert(DeliveryVersusPaymentV1.CallerMustBeSettlementCreator.selector);
+    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+  }
+
+  function test_setNettedFlows_RevertsIfNettedFlowsNotEquivalent() public {
+    // Arrange
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 20);
+
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows = new IDeliveryVersusPaymentV1.Flow[](0);
+
+    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("caller_not_creator"), cutoff, false);
+
+    // Act & Assert
+    vm.expectRevert(DeliveryVersusPaymentV1.NotEquivalentNettedFlows.selector);
+    dvp.setNettedFlows(settlementId, nettedFlows);
+  }
+
 }

@@ -263,7 +263,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (, , , , bool isSettled, ,) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, ,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -293,7 +293,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (, , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -393,7 +393,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     uint256 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, "Large Settlement", cutoff, false);
 
-    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, , , ,) = dvp.getSettlement(settlementId);
+    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, , , , ,) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, numFlows);
   }
 

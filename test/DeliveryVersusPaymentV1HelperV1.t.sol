@@ -108,7 +108,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement includes at least one flow with token == usdc
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasUSDC = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == usdc) {
@@ -185,7 +185,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement involves Bob
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(returnedIds[i]);
       bool involvesBob = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].from == bob || flows[j].to == bob) {
@@ -230,7 +230,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one Ether flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasEtherFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == address(0)) {
@@ -255,7 +255,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one ERC20 flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(returnedIds[i]);
       bool hasERC20Flow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && !flows[j].isNFT) {
@@ -280,7 +280,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one NFT flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , ,) = dvp.getSettlement(returnedIds[i]);
+      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , ,) = dvp.getSettlement(returnedIds[i]);
       bool hasNFTFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && flows[j].isNFT) {
@@ -552,7 +552,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     assertEq(AssetToken(usdc).balanceOf(charlie), cBefore + 50);
 
     // isSettled set
-    (, , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 

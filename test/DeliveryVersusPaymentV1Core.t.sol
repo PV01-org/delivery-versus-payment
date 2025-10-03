@@ -16,11 +16,13 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
   function test_createSettlement_WithValidFlowsAndFutureCutoff_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
     uint256 cutoff = _getFutureTimestamp(7 days);
+    string memory refInput = _ref("create");
 
     vm.expectEmit(true, true, false, true);
     emit DeliveryVersusPaymentV1.SettlementCreated(1, address(this));
 
-    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
+//    vm.prank(creator);
+    uint256 settlementId = dvp.createSettlement(flows, refInput, cutoff, false);
 
     assertEq(settlementId, 1);
     assertEq(dvp.settlementIdCounter(), 1);
@@ -31,12 +33,14 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
       uint256 cutoffDate,
       IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,
       IDeliveryVersusPaymentV1.Flow[] memory emptyNettedFlows,
+      address creatorAddress,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff
     ) = dvp.getSettlement(settlementId);
 
-    assertEq(ref, SETTLEMENT_REF);
+    assertEq(creatorAddress, address(this));
+    assertEq(ref, refInput);
     assertEq(cutoffDate, cutoff);
     assertEq(retrievedFlows.length, flows.length);
     assertEq(emptyNettedFlows.length, 0);
@@ -51,7 +55,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , , bool isSettled, bool isAutoSettled, ) = dvp.getSettlement(settlementId);
+    (, , , , , bool isSettled, bool isAutoSettled, ) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
   }
@@ -61,7 +65,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, nettedFlows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
+    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
 
     assertEq(nettedFlows.length, retrievedNettedFlows.length);
     assertFalse(isSettled);
@@ -79,7 +83,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, emptyFlows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
+    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
     assertEq(retrievedNettedFlows.length, 0);
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
@@ -186,7 +190,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, netted, _ref("zero_nft_id"), _getFutureTimestamp(3 days), false);
 
-    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , , ) = dvp.getSettlement(settlementId);
+    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , , , ) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, 1);
     assertEq(retrievedNettedFlows.length, 1);
     assertEq(retrievedFlows[0].amountOrId, 0);
@@ -244,6 +248,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
       uint256 cutoffDate,
       IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,
       IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
+      address creatorAddress,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff
@@ -253,6 +258,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     assertEq(cutoffDate, cutoff);
     assertEq(retrievedFlows.length, 4);
     assertEq(retrievedNettedFlows.length, 0);
+    assertEq(creatorAddress, address(this));
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
     assertFalse(useNettingOff);
@@ -369,13 +375,5 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
   function test_receive_WithDirectETHTransfer_Reverts() public {
     vm.expectRevert(DeliveryVersusPaymentV1.CannotSendEtherDirectly.selector);
     payable(address(dvp)).transfer(1 ether);
-  }
-
-
-  //--------------------------------------------------------------------------------
-  // Utility
-  //--------------------------------------------------------------------------------
-  function _ref(string memory tag) internal pure returns (string memory) {
-    return string(abi.encodePacked(SETTLEMENT_REF, "-", tag));
   }
 }

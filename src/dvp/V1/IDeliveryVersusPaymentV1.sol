@@ -42,6 +42,7 @@ interface IDeliveryVersusPaymentV1 {
    * @return cutoffDate The settlement's cutoff date.
    * @return flows An array of flows contained in the settlement.
    * @return nettedFlows An array of netted flows provided to the settlement upon creation.
+   * @return creatorAddress The address that created the settlement.
    * @return isSettled True if the settlement has been executed.
    * @return isAutoSettled True if the settlement is set for auto-settlement.
    * @return useNettingOff True if the settlement uses netting-off.
@@ -56,6 +57,7 @@ interface IDeliveryVersusPaymentV1 {
       uint256 cutoffDate,
       Flow[] memory flows,
       Flow[] memory nettedFlows,
+      address creatorAddress,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff

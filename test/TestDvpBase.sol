@@ -21,6 +21,7 @@ import {IDeliveryVersusPaymentV1 as IMockDVP} from "../src/mock/IDeliveryVersusP
 contract TestDvpBase is Test {
   // Test actors
   address public deployer;
+  address public creator;
   address public alice;
   address public bob;
   address public charlie;
@@ -82,6 +83,7 @@ contract TestDvpBase is Test {
   function setUp() public virtual {
     // Set up test actors
     deployer = address(this);
+    creator = makeAddr("creator");
     alice = makeAddr("alice");
     bob = makeAddr("bob");
     charlie = makeAddr("charlie");
@@ -294,5 +296,10 @@ contract TestDvpBase is Test {
 
   function _advanceTime(uint256 secondsToMove) internal {
     vm.warp(block.timestamp + secondsToMove);
+  }
+
+  // Helper to create a unique settlement reference by appending a tag to the constant base reference
+  function _ref(string memory tag) internal pure returns (string memory) {
+    return string(abi.encodePacked(SETTLEMENT_REF, "-", tag));
   }
 }

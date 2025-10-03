@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-added-large-files
+
+  # Lint/format Solidity with Foundry formatter (standard Foundry format as configured in foundry.toml)
+  - repo: local
+    hooks:
+      - id: forge-fmt
+        name: Check Solidity formatting with forge fmt (Foundry)
+        entry: bash -c 'forge fmt --check'
+        language: system
+        files: \.sol$
+        pass_filenames: false

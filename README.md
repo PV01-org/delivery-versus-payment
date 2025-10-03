@@ -155,6 +155,25 @@ Topic0 values for events are:
 | SettlementCreated(uint256,address)                          | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
 | SettlementExecuted(uint256,address)                         | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
 
+## Linting and pre-commit
+This repository uses pre-commit to run lightweight checks and enforce a standard Solidity code format via Foundry.
+
+Setup (one-time):
+- Install pre-commit (choose one):
+  - pipx: `pipx install pre-commit`
+  - pip: `pip install --user pre-commit`
+  - Homebrew (macOS): `brew install pre-commit`
+- Ensure Foundry is installed and available in your PATH: https://book.getfoundry.sh/getting-started/installation
+- Enable hooks in this repo: `pre-commit install`
+
+Usage:
+- Run on all files: `pre-commit run --all-files`
+- On commit, hooks will run automatically.
+- The Solidity formatter runs in check mode (`forge fmt --check`). If formatting fails, fix with: `forge fmt`
+
+Formatting standard:
+- Uses Foundry's standard formatter configured in `foundry.toml` under `[fmt]` (e.g., `line_length = 120`, `tab_width = 2`).
+
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 

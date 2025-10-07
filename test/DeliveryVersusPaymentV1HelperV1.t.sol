@@ -15,6 +15,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
+
   }
 
   function setUp() public override {
@@ -72,14 +73,14 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getSettlementsByToken_WithUSDC_ReturnsMatchingSettlements() public view {
     uint256 pageSize = 5;
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, pageSize);
+    (uint256[] memory returnedIds,) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, pageSize);
 
     assertGt(returnedIds.length, 0);
     assertLe(returnedIds.length, pageSize);
 
     // Verify that each settlement includes at least one flow with token == usdc
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
       bool hasUSDC = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == usdc) {
@@ -95,12 +96,8 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     address randomToken = address(0x1234567890123456789012345678901234567890);
     uint256 pageSize = 5;
 
-    (uint256[] memory returnedIds, uint256 nextCursor) = dvpHelper.getSettlementsByToken(
-      address(dvp),
-      randomToken,
-      0,
-      pageSize
-    );
+    (uint256[] memory returnedIds, uint256 nextCursor) =
+      dvpHelper.getSettlementsByToken(address(dvp), randomToken, 0, pageSize);
 
     assertEq(returnedIds.length, 0);
     assertEq(nextCursor, 0);
@@ -121,12 +118,8 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     uint256 cursor = 0;
 
     do {
-      (uint256[] memory returnedIds, uint256 nextCursor) = dvpHelper.getSettlementsByToken(
-        address(dvp),
-        usdc,
-        cursor,
-        pageSize
-      );
+      (uint256[] memory returnedIds, uint256 nextCursor) =
+        dvpHelper.getSettlementsByToken(address(dvp), usdc, cursor, pageSize);
 
       for (uint256 i = 0; i < returnedIds.length; i++) {
         allIds[totalCount] = returnedIds[i];
@@ -150,13 +143,13 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getSettlementsByInvolvedParty_WithBob_ReturnsMatchingSettlements() public view {
     uint256 pageSize = 5;
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), bob, 0, pageSize);
+    (uint256[] memory returnedIds,) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), bob, 0, pageSize);
 
     assertGt(returnedIds.length, 0);
 
     // Verify that each settlement involves Bob
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
       bool involvesBob = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].from == bob || flows[j].to == bob) {
@@ -172,7 +165,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     address randomParty = address(0x1234567890123456789012345678901234567890);
     uint256 pageSize = 5;
 
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), randomParty, 0, pageSize);
+    (uint256[] memory returnedIds,) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), randomParty, 0, pageSize);
 
     assertEq(returnedIds.length, 0);
   }
@@ -190,18 +183,14 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getSettlementsByTokenType_WithEther_ReturnsMatchingSettlements() public view {
     uint256 pageSize = 5;
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.Ether,
-      0,
-      pageSize
-    );
+    (uint256[] memory returnedIds,) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.Ether, 0, pageSize);
 
     assertGt(returnedIds.length, 0);
 
     // Verify that each settlement has at least one Ether flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
       bool hasEtherFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == address(0)) {
@@ -215,18 +204,14 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
   function test_getSettlementsByTokenType_WithERC20_ReturnsMatchingSettlements() public view {
     uint256 pageSize = 5;
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-      0,
-      pageSize
-    );
+    (uint256[] memory returnedIds,) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, 0, pageSize);
 
     assertGt(returnedIds.length, 0);
 
     // Verify that each settlement has at least one ERC20 flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
       bool hasERC20Flow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && !flows[j].isNFT) {
@@ -240,18 +225,14 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
   function test_getSettlementsByTokenType_WithNFT_ReturnsMatchingSettlements() public view {
     uint256 pageSize = 5;
-    (uint256[] memory returnedIds, ) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.NFT,
-      0,
-      pageSize
-    );
+    (uint256[] memory returnedIds,) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.NFT, 0, pageSize);
 
     assertGt(returnedIds.length, 0);
 
     // Verify that each settlement has at least one NFT flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , ) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
       bool hasNFTFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && flows[j].isNFT) {
@@ -275,22 +256,15 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     uint256 pageSize = 5;
 
     // First call with startCursor = 0 to get the nextCursor
-    (uint256[] memory firstPageIds, uint256 nextCursor) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-      0,
-      pageSize
-    );
+    (uint256[] memory firstPageIds, uint256 nextCursor) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, 0, pageSize);
 
     assertGt(firstPageIds.length, 0);
 
     // Only proceed if there is a valid nextCursor (non-zero)
     if (nextCursor != 0) {
-      (uint256[] memory nextPageIds, ) = dvpHelper.getSettlementsByTokenType(
-        address(dvp),
-        DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-        nextCursor,
-        pageSize
+      (uint256[] memory nextPageIds,) = dvpHelper.getSettlementsByTokenType(
+        address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, nextCursor, pageSize
       );
 
       // Verify that the call with a nonzero startCursor returns an array (could be empty or not)
@@ -321,12 +295,8 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     uint256 cursor = 0;
 
     do {
-      (uint256[] memory returnedIds, uint256 nextCursor) = dvpHelper.getSettlementsByToken(
-        address(dvp),
-        usdc,
-        cursor,
-        pageSize
-      );
+      (uint256[] memory returnedIds, uint256 nextCursor) =
+        dvpHelper.getSettlementsByToken(address(dvp), usdc, cursor, pageSize);
 
       for (uint256 i = 0; i < returnedIds.length; i++) {
         allIds[totalCount] = returnedIds[i];
@@ -354,12 +324,8 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     uint256 cursor = 0;
 
     do {
-      (uint256[] memory returnedIds, uint256 nextCursor) = dvpHelper.getSettlementsByInvolvedParty(
-        address(dvp),
-        alice,
-        cursor,
-        pageSize
-      );
+      (uint256[] memory returnedIds, uint256 nextCursor) =
+        dvpHelper.getSettlementsByInvolvedParty(address(dvp), alice, cursor, pageSize);
 
       for (uint256 i = 0; i < returnedIds.length; i++) {
         allIds[totalCount] = returnedIds[i];
@@ -388,10 +354,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     do {
       (uint256[] memory returnedIds, uint256 nextCursor) = dvpHelper.getSettlementsByTokenType(
-        address(dvp),
-        DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-        cursor,
-        pageSize
+        address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, cursor, pageSize
       );
 
       for (uint256 i = 0; i < returnedIds.length; i++) {
@@ -418,24 +381,16 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getAllMethods_WithValidPageSizeBoundaries_Succeed() public view {
     // Test minimum valid page size (2)
-    (uint256[] memory ids1, ) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, 2);
-    (uint256[] memory ids2, ) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), alice, 0, 2);
-    (uint256[] memory ids3, ) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-      0,
-      2
-    );
+    (uint256[] memory ids1,) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, 2);
+    (uint256[] memory ids2,) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), alice, 0, 2);
+    (uint256[] memory ids3,) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, 0, 2);
 
     // Test maximum valid page size (200)
-    (uint256[] memory ids4, ) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, 200);
-    (uint256[] memory ids5, ) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), alice, 0, 200);
-    (uint256[] memory ids6, ) = dvpHelper.getSettlementsByTokenType(
-      address(dvp),
-      DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-      0,
-      200
-    );
+    (uint256[] memory ids4,) = dvpHelper.getSettlementsByToken(address(dvp), usdc, 0, 200);
+    (uint256[] memory ids5,) = dvpHelper.getSettlementsByInvolvedParty(address(dvp), alice, 0, 200);
+    (uint256[] memory ids6,) =
+      dvpHelper.getSettlementsByTokenType(address(dvp), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, 0, 200);
 
     // All should succeed (not revert)
     assertGe(ids1.length, 0);
@@ -450,14 +405,10 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     // Deploy a fresh DVP contract with no settlements
     DeliveryVersusPaymentV1 emptyDVP = new DeliveryVersusPaymentV1();
 
-    (uint256[] memory ids1, ) = dvpHelper.getSettlementsByToken(address(emptyDVP), usdc, 0, 5);
-    (uint256[] memory ids2, ) = dvpHelper.getSettlementsByInvolvedParty(address(emptyDVP), alice, 0, 5);
-    (uint256[] memory ids3, ) = dvpHelper.getSettlementsByTokenType(
-      address(emptyDVP),
-      DeliveryVersusPaymentV1HelperV1.TokenType.ERC20,
-      0,
-      5
-    );
+    (uint256[] memory ids1,) = dvpHelper.getSettlementsByToken(address(emptyDVP), usdc, 0, 5);
+    (uint256[] memory ids2,) = dvpHelper.getSettlementsByInvolvedParty(address(emptyDVP), alice, 0, 5);
+    (uint256[] memory ids3,) =
+      dvpHelper.getSettlementsByTokenType(address(emptyDVP), DeliveryVersusPaymentV1HelperV1.TokenType.ERC20, 0, 5);
 
     assertEq(ids1.length, 0);
     assertEq(ids2.length, 0);

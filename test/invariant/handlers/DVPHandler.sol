@@ -89,12 +89,11 @@ contract DVPHandler is Test {
    * @param cutoffSeed Random seed for cutoff date (bounded 1 hour - 7 days)
    * @param isAutoSettled Whether settlement should auto-execute after final approval
    */
-  function createSettlementEth(
-    uint256 actorSeed,
-    uint256 flowCountSeed,
-    uint256 cutoffSeed,
-    bool isAutoSettled
-  ) external useActor(actorSeed) countCall("createSettlementEth") {
+  function createSettlementEth(uint256 actorSeed, uint256 flowCountSeed, uint256 cutoffSeed, bool isAutoSettled)
+    external
+    useActor(actorSeed)
+    countCall("createSettlementEth")
+  {
     uint256 flowCount = bound(flowCountSeed, 1, 5);
     uint256 cutoffDate = block.timestamp + bound(cutoffSeed, 3600, 86400 * 7); // 1 hour to 7 days
 
@@ -125,10 +124,11 @@ contract DVPHandler is Test {
    * @param actorSeed Random seed to select which actor approves
    * @param settlementSeed Random seed to select which settlement to approve
    */
-  function approveSettlementEth(
-    uint256 actorSeed,
-    uint256 settlementSeed
-  ) external useActor(actorSeed) countCall("approveSettlementEth") {
+  function approveSettlementEth(uint256 actorSeed, uint256 settlementSeed)
+    external
+    useActor(actorSeed)
+    countCall("approveSettlementEth")
+  {
     uint256 settlementId = _getRandomSettlement(settlementSeed);
 
     // Calculate how much ETH the actor needs to deposit for their flows
@@ -142,7 +142,7 @@ contract DVPHandler is Test {
       this.updateTrackingApprovalByParty(settlementId, ethRequired);
 
       // Perhaps the settlement was also executed
-      (, , , bool isSettled, bool isAutoSettled) = dvp.getSettlement(settlementId);
+      (,,, bool isSettled, bool isAutoSettled) = dvp.getSettlement(settlementId);
       if (isSettled && isAutoSettled) {
         this.updateTrackingExecuteSettlement(settlementId, true);
       }
@@ -157,10 +157,11 @@ contract DVPHandler is Test {
    * @param actorSeed Random seed to select which actor executes (anyone can execute)
    * @param settlementSeed Random seed to select which settlement to execute
    */
-  function executeSettlement(
-    uint256 actorSeed,
-    uint256 settlementSeed
-  ) external useActor(actorSeed) countCall("executeSettlement") {
+  function executeSettlement(uint256 actorSeed, uint256 settlementSeed)
+    external
+    useActor(actorSeed)
+    countCall("executeSettlement")
+  {
     uint256 settlementId = _getRandomSettlement(settlementSeed);
     try dvp.executeSettlement(settlementId) {
       this.updateTrackingExecuteSettlement(settlementId, false);
@@ -177,14 +178,13 @@ contract DVPHandler is Test {
     address from = actors[fromIndex];
     address to = actors[toIndex];
 
-    return
-      IDeliveryVersusPaymentV1.Flow({
-        token: address(0),
-        isNFT: false,
-        from: from,
-        to: to,
-        amountOrId: bound(seed, 0.1 ether, 10 ether)
-      });
+    return IDeliveryVersusPaymentV1.Flow({
+      token: address(0),
+      isNFT: false,
+      from: from,
+      to: to,
+      amountOrId: bound(seed, 0.1 ether, 10 ether)
+    });
   }
 
   /// @dev Get random settlement, or a non-existing one if none exist
@@ -198,11 +198,7 @@ contract DVPHandler is Test {
   /// @dev Calculates ETH required for msg.sender to approve a settlement
   function calculateEthRequiredForMsgSender(uint256 settlementId) external view returns (uint256) {
     try dvp.getSettlement(settlementId) returns (
-      string memory,
-      uint256,
-      IDeliveryVersusPaymentV1.Flow[] memory flows,
-      bool,
-      bool
+      string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
     ) {
       uint256 ethRequired = 0;
       // Sum all ETH amounts this party is sending

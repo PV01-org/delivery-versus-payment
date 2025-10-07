@@ -56,9 +56,7 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
     uint256 totalExecuted = handler.ghost_totalSettlementsExecuted();
     uint256 totalExecutedAuto = handler.ghost_totalSettlementsExecutedAuto();
     assertLe(
-      totalExecuted + totalExecutedAuto,
-      totalCreated,
-      "Executed settlements should not exceed created settlements"
+      totalExecuted + totalExecutedAuto, totalCreated, "Executed settlements should not exceed created settlements"
     );
   }
 
@@ -82,15 +80,13 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
   }
 
   /// @dev Check if a specific settlement exists and get its details
-  function getSettlementDetails(
-    uint256 settlementId
-  ) external view returns (bool exists, bool isSettled, uint256 flowCount, uint256 cutoffDate) {
+  function getSettlementDetails(uint256 settlementId)
+    external
+    view
+    returns (bool exists, bool isSettled, uint256 flowCount, uint256 cutoffDate)
+  {
     try dvp.getSettlement(settlementId) returns (
-      string memory,
-      uint256 _cutoffDate,
-      IDeliveryVersusPaymentV1.Flow[] memory flows,
-      bool _isSettled,
-      bool
+      string memory, uint256 _cutoffDate, IDeliveryVersusPaymentV1.Flow[] memory flows, bool _isSettled, bool
     ) {
       exists = true;
       isSettled = _isSettled;

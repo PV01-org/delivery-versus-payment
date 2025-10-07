@@ -14,7 +14,7 @@ function approveSettlements(1, 2)
   |
   | approve settlement 1    persists even if subsequent execute fails
   +-- call .executeSettlement(1)  succeeds
-  | 
+  |
   | approve setttlement 2   persists even if subseqeuent execute fails
   +-- call .executeSettlement(2)  fails, emits event log with details
   |
@@ -23,10 +23,10 @@ function approveSettlements(1, 2)
 
 The way this behaviour is implemented is by using `try/catch{}` around each `executeSettlement()` call inside the `approveSettlements()` function. Any time an `executeSettlement()` function call fails, it is caught by the catch and an event log is emitted explaining what the error was. The overall transaction does not revert. It still succeeds, which means the approval step persists for failed execution. In addition, any and all other settlements in the batch which were processed successfully are also persisted.
 
-## But what has this got to do with reentrancy protection? 
+## But what has this got to do with reentrancy protection?
 There are two constaints that affect what can be built:
 1. A Solidity constraint on the use of `try/catch{}` is that the `try` part can only operate on external and public functions.
-2. An OpenZeppelin constraint on the use of their `nonReentrant` modifier is, sensibly enough, that a `nonReentrant` function cannot call another `nonReentrant` function in the same contract. 
+2. An OpenZeppelin constraint on the use of their `nonReentrant` modifier is, sensibly enough, that a `nonReentrant` function cannot call another `nonReentrant` function in the same contract.
 
 Constraint `2.` above means we cannot have `approveSettlements()` be `nonReentrant` and `executeSettlement()` be `nonReentrant`. This is because the approval function can trigger the execute function. The OpenZeppelin solution to this is that the "inner" function should be split into a public/private pair (or its equivalent with external/internal). The public part is protected by a `nonReentrant` modifier, for example:
 

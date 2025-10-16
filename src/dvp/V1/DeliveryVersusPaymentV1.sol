@@ -83,10 +83,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error ApprovalNotGranted();
   error CallerNotInvolved();
   error CallerMustBeDvpContract();
+  error CallerMustBeSettlementCreator();
   error CannotSendEtherDirectly();
   error CutoffDateNotPassed();
   error CutoffDatePassed();
-  error IncorrectETHAmount();
+  error IncorrectETHAmount(uint256 actual, uint256 expected);
   error InvalidERC20Token();
   error InvalidERC721Token();
   error NoETHToWithdraw();
@@ -94,6 +95,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error SettlementAlreadyExecuted();
   error SettlementDoesNotExist();
   error SettlementNotApproved();
+  error NotEquivalentNettedFlows();
+  error ZeroNettedAmountOrId();
+  error AmountOrIdTooLarge(uint256 amountOrId, int256 delta);
+  error UnknownPartyInNettedFlow();
+  error UnknownAssetInNettedFlow();
 
   /**
    * @dev TokenStatus contains an assessment of how ready a party is to settle, for a particular token.
@@ -118,10 +124,13 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     string settlementReference;
     uint256 cutoffDate;
     Flow[] flows;
+    Flow[] nettedFlows;
     mapping(address => bool) approvals;
     mapping(address => uint256) ethDeposits;
+    address creatorAddress;
     bool isSettled;
     bool isAutoSettled;
+    bool useNettingOff;
   }
 
   mapping(uint256 => Settlement) private settlements;
@@ -180,19 +189,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       if (settlement.isSettled) revert SettlementAlreadyExecuted();
       if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
       if (settlement.approvals[msg.sender]) revert ApprovalAlreadyGranted();
-
-      uint256 ethAmountRequired = 0;
-      bool isInvolved = false;
-
-      for (uint256 j = 0; j < lengthFlows; j++) {
-        Flow storage flow = settlement.flows[j];
-        if (flow.from == msg.sender) {
-          isInvolved = true;
-          if (flow.token == address(0)) {
-            ethAmountRequired += flow.amountOrId;
-          }
-        }
-      }
+      // Calculate ETH required for this settlement by this party, and check that the party is involved
+      (uint256 ethAmountRequired, bool isInvolved) =
+        _getEthRequiredAndIsInvolved(settlement.useNettingOff ? settlement.nettedFlows : settlement.flows, msg.sender);
 
       if (!isInvolved) revert CallerNotInvolved();
 
@@ -205,7 +204,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       emit SettlementApproved(settlementId, msg.sender);
     }
 
-    if (msg.value != totalEthRequired) revert IncorrectETHAmount();
+    if (msg.value != totalEthRequired) revert IncorrectETHAmount(msg.value, totalEthRequired);
     if (msg.value > 0) {
       emit ETHReceived(msg.sender, msg.value);
     }
@@ -219,8 +218,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         // Other settlements will still be processed, and the earlier approval will remain. Note that try{} only
         // supports external/public calls.
         try this.executeSettlementInner(msg.sender, settlementId) {
-          // Success
-        } catch Error(string memory reason) {
+        // Success
+        }
+        catch Error(string memory reason) {
           // Revert with reason string
           emit SettlementAutoExecutionFailedReason(settlementId, msg.sender, reason);
         } catch Panic(uint256 errorCode) {
@@ -234,11 +234,83 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     }
   }
 
+  function _getEthRequiredAndIsInvolved(Flow[] storage flows, address party)
+    internal
+    view
+    returns (uint256 ethAmountRequired, bool isInvolved)
+  {
+    ethAmountRequired = 0;
+    isInvolved = false;
+    uint256 lengthFlows = flows.length;
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      Flow storage flow = flows[i];
+      if (flow.from == party || flow.to == party) {
+        isInvolved = true;
+      }
+      if (flow.token == address(0) && flow.from == party) {
+        ethAmountRequired += flow.amountOrId;
+      }
+    }
+  }
+
+  /**
+   * @dev Sets the netted flows for a given settlement. This function allows the creator of the settlement
+   * to provide an optimized set of flows (nettedFlows) that will be used for processing the settlement.
+   * Reverts if:
+   * - The settlement does not exist.
+   * - The settlement has already been executed.
+   * - The current time is past the settlement's cutoff date.
+   * - The caller is not the creator of the settlement.
+   * - The provided netted flows are not equivalent to the original flows in terms of total amounts per party and asset.
+   *
+   * @param settlementId The ID of the settlement to update.
+   * @param nettedFlows The optimized set of flows to be used for the settlement.
+   */
+  function setNettedFlows(uint256 settlementId, Flow[] calldata nettedFlows) external {
+    Settlement storage settlement = settlements[settlementId];
+
+    // Revert if the settlement does not exist (no flows defined).
+    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+    if (settlement.isSettled) revert SettlementAlreadyExecuted();
+    if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
+    if (msg.sender != settlement.creatorAddress) revert CallerMustBeSettlementCreator();
+
+    // Validate the equivalence of the original flows and the provided netted flows.
+    _validateNettedFlows(settlement.flows, nettedFlows);
+
+    // Update the settlement with the netted flows and enable netting off.
+    settlement.nettedFlows = nettedFlows;
+    settlement.useNettingOff = true;
+  }
+
   /**
    * @dev Creates a new settlement with the specified flows and cutoff date.
    * Reverts if cutoff date is in the past, no flows are provided, or a claimed NFT token is not
    * and NFT. There is intentionally no limit on the number of flows, the current chain's block
    * gas limit acts as a cap for the max flows.
+   * Given that createSettlement is called with nettedFlows, useNettingOff is set to true.
+   * @param flows The flows to include in the settlement.
+   * @param nettedFlows The flows that will be used to process the settlement, used to provide optimised settlement solutions.
+   * @param settlementReference A free text reference for the settlement.
+   * @param cutoffDate The deadline for approvals and execution.
+   * @param isAutoSettled If true, the settlement will be executed automatically after all approvals are in place.
+   */
+  function createSettlement(
+    Flow[] calldata flows,
+    Flow[] calldata nettedFlows,
+    string calldata settlementReference,
+    uint256 cutoffDate,
+    bool isAutoSettled
+  ) external returns (uint256 id) {
+    return _createSettlement(flows, nettedFlows, settlementReference, cutoffDate, isAutoSettled, true);
+  }
+
+  /**
+   * @dev Creates a new settlement with the specified flows and cutoff date.
+   * Reverts if cutoff date is in the past, no flows are provided, or a claimed NFT token is not
+   * and NFT. There is intentionally no limit on the number of flows, the current chain's block
+   * gas limit acts as a cap for the max flows.
+   * Defaults useNettingOff to false.
    * @param flows The flows to include in the settlement.
    * @param settlementReference A free text reference for the settlement.
    * @param cutoffDate The deadline for approvals and execution.
@@ -250,9 +322,35 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     uint256 cutoffDate,
     bool isAutoSettled
   ) external returns (uint256 id) {
+    return _createSettlement(flows, new Flow[](0), settlementReference, cutoffDate, isAutoSettled, false);
+  }
+
+  /**
+   * @dev Creates a new settlement with the specified flows and cutoff date.
+   * Reverts if cutoff date is in the past, no flows are provided, or a claimed NFT token is not
+   * and NFT. There is intentionally no limit on the number of flows, the current chain's block
+   * gas limit acts as a cap for the max flows.
+   * @param flows The flows to include in the settlement.
+   * @param nettedFlows The flows that will be used to process the settlement, used to provide optimised settlement solutions.
+   * @param settlementReference A free text reference for the settlement.
+   * @param cutoffDate The deadline for approvals and execution.
+   * @param isAutoSettled If true, the settlement will be executed automatically after all approvals are in place.
+   * @param useNettingOff If true, the settlement will use netting off with the provided nettedFlows.
+   */
+  function _createSettlement(
+    Flow[] calldata flows,
+    Flow[] memory nettedFlows,
+    string calldata settlementReference,
+    uint256 cutoffDate,
+    bool isAutoSettled,
+    bool useNettingOff
+  ) internal returns (uint256 id) {
     if (block.timestamp > cutoffDate) revert CutoffDatePassed();
     uint256 lengthFlows = flows.length;
     if (lengthFlows == 0) revert NoFlowsProvided();
+    // no need to check for nettedFlows being not empty if useNettingOff is false at runtime
+    // as useNettingOff is not an external input and we fully control the value for it.
+    // Also an empty nettedFlows array is valid if all flows are zero-sum.
 
     // Validate flows
     for (uint256 i = 0; i < lengthFlows; i++) {
@@ -263,14 +361,18 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         if (!_isERC20(flow.token)) revert InvalidERC20Token();
       }
     }
+    if (useNettingOff) _validateNettedFlows(flows, nettedFlows);
 
     // Store new settlement
     id = ++settlementIdCounter;
     Settlement storage settlement = settlements[id];
+    settlement.creatorAddress = msg.sender;
     settlement.settlementReference = settlementReference;
     settlement.cutoffDate = cutoffDate;
     settlement.isAutoSettled = isAutoSettled;
+    settlement.useNettingOff = useNettingOff;
     settlement.flows = flows; // needs "via IR" compilation
+    settlement.nettedFlows = nettedFlows; // needs "via IR" compilation
 
     emit SettlementCreated(id, msg.sender);
   }
@@ -294,29 +396,13 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       revert CallerMustBeDvpContract();
     }
     Settlement storage settlement = settlements[settlementId];
+
     if (settlement.flows.length == 0) revert SettlementDoesNotExist();
     if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
     if (settlement.isSettled) revert SettlementAlreadyExecuted();
     if (!isSettlementApproved(settlementId)) revert SettlementNotApproved();
 
-    uint256 lengthFlows = settlement.flows.length;
-    for (uint256 i = 0; i < lengthFlows; i++) {
-      Flow storage flow = settlement.flows[i];
-      if (flow.token == address(0)) {
-        // ETH Transfer
-        // Note: settlement.ethDeposits[flow.from] must == flow.amount, otherwise approval would not have been
-        // possible and isSettlementApproved() would have failed. So no need to check for insufficient balance.
-        uint256 amount = flow.amountOrId;
-        settlement.ethDeposits[flow.from] -= amount;
-        // sendValue reverts if unsuccessful
-        Address.sendValue(payable(flow.to), amount);
-      } else {
-        // ERC-721 or ERC-20 transfer in the same way (must cast to IERC20 for OZ safeTransfer for ERC-20)
-        IERC20 eitherToken = IERC20(flow.token);
-        // safeTransfer reverts if unsuccessful for ERC-20 and ERC-721
-        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
-      }
-    }
+    _executeFlowsFromStorage(settlement);
 
     settlement.isSettled = true;
     emit SettlementExecuted(settlementId, originalCaller);
@@ -333,8 +419,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       string memory settlementReference,
       uint256 cutoffDate,
       Flow[] memory flows,
+      Flow[] memory nettedFlows,
+      address creatorAddress,
       bool isSettled,
-      bool isAutoSettled
+      bool isAutoSettled,
+      bool useNettingOff
     )
   {
     Settlement storage settlement = settlements[settlementId];
@@ -343,8 +432,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       settlement.settlementReference,
       settlement.cutoffDate,
       settlement.flows,
+      settlement.nettedFlows,
+      settlement.creatorAddress,
       settlement.isSettled,
-      settlement.isAutoSettled
+      settlement.isAutoSettled,
+      settlement.useNettingOff
     );
   }
 
@@ -451,6 +543,120 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   //------------------------------------------------------------------------------
   // Internal
   //------------------------------------------------------------------------------
+  // Internal execution helpers
+
+  // Validate whether original flows and netted flows are equivalent.
+  // Reverts if not equivalent
+  // Returns partyCount and array of unique parties (length = partyCount) for convenience.
+  function _validateNettedFlows(Flow[] memory originalFlows, Flow[] memory nettedFlows)
+    internal
+    pure
+    returns (uint256 partyCount, address[] memory parties)
+  {
+    // Gather unique parties and asset keys from original flows
+    uint256 lengthOriginalFlows = originalFlows.length;
+    uint256 maxParties = lengthOriginalFlows * 2;
+    parties = new address[](maxParties);
+    partyCount = 0;
+
+    uint256 maxKeys = lengthOriginalFlows;
+    bytes32[] memory keys = new bytes32[](maxKeys);
+    uint256 keyCount = 0;
+
+    // Track whether each key represents an NFT (true) or fungible (false)
+    bool[] memory isNFTKey = new bool[](maxKeys);
+
+    for (uint256 i = 0; i < lengthOriginalFlows; i++) {
+      Flow memory flow = originalFlows[i];
+      // Track parties
+      uint256 idxFrom = _indexOfAddress(parties, partyCount, flow.from);
+      if (idxFrom == type(uint256).max) {
+        parties[partyCount++] = flow.from;
+      }
+      uint256 idxTo = _indexOfAddress(parties, partyCount, flow.to);
+      if (idxTo == type(uint256).max) {
+        parties[partyCount++] = flow.to;
+      }
+      // Track asset keys
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
+      uint256 keyIdx = _indexOfBytes32(keys, keyCount, key);
+      if (keyIdx == type(uint256).max) {
+        keys[keyCount] = key;
+        isNFTKey[keyCount] = flow.isNFT;
+        keyCount++;
+      }
+    }
+
+    // Allocate balances matrix: [keyCount][partyCount] flattened
+    int256[] memory balances = new int256[](partyCount * keyCount);
+
+    // Step 1: Apply original flows positively
+    for (uint256 i = 0; i < originalFlows.length; i++) {
+      Flow memory flow = originalFlows[i];
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
+      uint256 k = _indexOfBytes32(keys, keyCount, key);
+      uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, flow.to);
+
+      int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
+      uint256 idxFrom = k * partyCount + pFrom;
+      uint256 idxTo = k * partyCount + pTo;
+      balances[idxFrom] -= delta;
+      balances[idxTo] += delta;
+    }
+
+    // Step 2: Apply netted flows with flipped signs (subtract netted effect)
+    uint256 lengthNettedFlows = nettedFlows.length;
+    for (uint256 i = 0; i < lengthNettedFlows; i++) {
+      Flow memory flow = nettedFlows[i];
+      require(flow.isNFT || flow.amountOrId > 0, ZeroNettedAmountOrId());
+
+      // Both parties must be from original settlement
+      uint256 pFrom = _indexOfAddress(parties, partyCount, flow.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, flow.to);
+      require(pFrom != type(uint256).max && pTo != type(uint256).max, UnknownPartyInNettedFlow());
+
+      // Asset must exist in original
+      bytes32 key = _assetKey(flow.token, flow.isNFT, flow.amountOrId);
+      uint256 k = _indexOfBytes32(keys, keyCount, key);
+      require(k != type(uint256).max, UnknownAssetInNettedFlow());
+
+      int256 delta = flow.isNFT ? int256(1) : int256(flow.amountOrId);
+      require(delta >= 0, AmountOrIdTooLarge(flow.amountOrId, delta));
+      uint256 idxFrom = k * partyCount + pFrom;
+      uint256 idxTo = k * partyCount + pTo;
+      balances[idxFrom] += delta; // flip signs compared to originals
+      balances[idxTo] -= delta;
+    }
+
+    // Step 3: Validate all balances are zero (equivalence)
+    for (uint256 k = 0; k < keyCount; k++) {
+      for (uint256 p = 0; p < partyCount; p++) {
+        require(balances[k * partyCount + p] == 0, NotEquivalentNettedFlows());
+      }
+    }
+  }
+
+  // Executes flows stored in settlement.flows or settlement.nettedFlows
+  // NB: This function assumes all necessary checks have been made before calling it.
+  function _executeFlowsFromStorage(Settlement storage settlement) internal {
+    Flow[] storage flows = settlement.useNettingOff ? settlement.nettedFlows : settlement.flows;
+    uint256 lengthFlows = flows.length;
+
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      Flow storage flow = flows[i];
+      if (flow.token == address(0)) {
+        uint256 amount = flow.amountOrId;
+        settlement.ethDeposits[flow.from] -= amount;
+        Address.sendValue(payable(flow.to), amount);
+      } else {
+        IERC20 eitherToken = IERC20(flow.token);
+        eitherToken.safeTransferFrom(flow.from, flow.to, flow.amountOrId);
+      }
+    }
+  }
+
   /**
    * @dev Internal helper to get ETH required and deposited for a party.
    * @param settlement The settlement to check.
@@ -464,12 +670,19 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     returns (uint256 etherRequired, uint256 etherDeposited)
   {
     uint256 lengthFlows = settlement.flows.length;
+    uint256 outgoingEth = 0;
+    uint256 incomingEth = 0;
     for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage flow = settlement.flows[i];
-      if (flow.from == party && flow.token == address(0)) {
-        etherRequired += flow.amountOrId;
+      if (flow.token == address(0)) {
+        if (flow.from == party) {
+          outgoingEth += flow.amountOrId;
+        } else if (flow.to == party) {
+          incomingEth += flow.amountOrId;
+        }
       }
     }
+    etherRequired = outgoingEth > incomingEth ? (outgoingEth - incomingEth) : 0;
     etherDeposited = settlement.ethDeposits[party];
   }
 
@@ -481,7 +694,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party)
+    internal
+    view
+    returns (TokenStatus[] memory)
+  {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -497,7 +714,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
           amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
-            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
+              || nft.isApprovedForAll(party, address(this))
+            ? f.amountOrId
+            : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {
@@ -520,6 +739,29 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     }
 
     return tokenStatuses;
+  }
+
+  /**
+   * @dev Internal version of {isERC721}
+   */
+  // Helper to compute asset key for balances: ERC-20/ETH use token address; ERC-721 uses keccak(token, id)
+  function _assetKey(address token, bool isNFT, uint256 amountOrId) internal pure returns (bytes32) {
+    return isNFT ? keccak256(abi.encode(token, amountOrId)) : bytes32(uint256(uint160(token)));
+  }
+
+  // Linear search helpers over memory arrays (sufficient for typical small settlements)
+  function _indexOfAddress(address[] memory arr, uint256 length, address a) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == a) return i;
+    }
+    return type(uint256).max;
+  }
+
+  function _indexOfBytes32(bytes32[] memory arr, uint256 length, bytes32 k) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == k) return i;
+    }
+    return type(uint256).max;
   }
 
   /**

@@ -15,7 +15,6 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
-
   }
 
   function setUp() public override {
@@ -50,6 +49,35 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     }
   }
 
+  /**
+   * @dev Compares two `NetRequirement` structs for equality.
+   * This function checks if the `ethRequiredNet` values are equal,
+   * and then verifies that the lengths of the `erc20Tokens` and `erc20NetRequired` arrays match.
+   * Finally, it iterates through the arrays to ensure all corresponding elements are equal.
+   *
+   * @param a The first `NetRequirement` struct to compare.
+   * @param b The second `NetRequirement` struct to compare.
+   */
+  function _assertEqNetRequirement(
+    DeliveryVersusPaymentV1HelperV1.NetRequirement memory a,
+    DeliveryVersusPaymentV1HelperV1.NetRequirement memory b
+  ) internal {
+    // Assert that the net ETH requirements are equal
+    assertEq(a.ethRequiredNet, b.ethRequiredNet);
+
+    // Assert that the lengths of the ERC20 tokens arrays are equal
+    assertEq(a.erc20Tokens.length, b.erc20Tokens.length);
+
+    // Assert that the lengths of the ERC20 net required arrays are equal
+    assertEq(a.erc20NetRequired.length, b.erc20NetRequired.length);
+
+    // Iterate through the ERC20 tokens and net required arrays to compare each element
+    for (uint256 i = 0; i < a.erc20Tokens.length; i++) {
+      assertEq(a.erc20Tokens[i], b.erc20Tokens[i]);
+      assertEq(a.erc20NetRequired[i], b.erc20NetRequired[i]);
+    }
+  }
+
   //--------------------------------------------------------------------------------
   // getTokenTypes Tests
   //--------------------------------------------------------------------------------
@@ -80,7 +108,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement includes at least one flow with token == usdc
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(returnedIds[i]);
       bool hasUSDC = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == usdc) {
@@ -149,7 +177,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement involves Bob
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(returnedIds[i]);
       bool involvesBob = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].from == bob || flows[j].to == bob) {
@@ -190,7 +218,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one Ether flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(returnedIds[i]);
       bool hasEtherFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token == address(0)) {
@@ -211,7 +239,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one ERC20 flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(returnedIds[i]);
       bool hasERC20Flow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && !flows[j].isNFT) {
@@ -232,7 +260,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
 
     // Verify that each settlement has at least one NFT flow
     for (uint256 i = 0; i < returnedIds.length; i++) {
-      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,) = dvp.getSettlement(returnedIds[i]);
+      (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(returnedIds[i]);
       bool hasNFTFlow = false;
       for (uint256 j = 0; j < flows.length; j++) {
         if (flows[j].token != address(0) && flows[j].isNFT) {
@@ -413,5 +441,214 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     assertEq(ids1.length, 0);
     assertEq(ids2.length, 0);
     assertEq(ids3.length, 0);
+  }
+
+  //--------------------------------------------------------------------------------
+  // computeNettedFlows Tests
+  //--------------------------------------------------------------------------------
+  function test_computeNettedFlows_ERC20Chain_GeneratesMinimalAndCreatesAndExecutes() public {
+    // Create a settlement with a USDC chain that nets down
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 100);
+    flows[1] = _createERC20Flow(bob, charlie, usdc, 70);
+    flows[2] = _createERC20Flow(charlie, alice, usdc, 20);
+
+    // Generate minimal netted flows via helper
+    IDeliveryVersusPaymentV1.Flow[] memory netted = dvpHelper.computeNettedFlows(flows);
+
+    // Expect 2 netted transfers: Alice->Bob 30, Alice->Charlie 50 (order is deterministic by helper)
+    assertEq(netted.length, 2, "Expected two netted flows for USDC");
+    assertEq(netted[0].token, usdc);
+    assertFalse(netted[0].isNFT);
+    assertEq(netted[0].from, alice);
+    assertEq(netted[0].to, bob);
+    assertEq(netted[0].amountOrId, 30);
+
+    assertEq(netted[1].token, usdc);
+    assertFalse(netted[1].isNFT);
+    assertEq(netted[1].from, alice);
+    assertEq(netted[1].to, charlie);
+    assertEq(netted[1].amountOrId, 50);
+
+    // Create settlement with netted flows, this will run the validation
+    uint256 settlementId = dvp.createSettlement(flows, netted, "USDC chain", _getFutureTimestamp(7 days), false);
+
+    // Approvals (allowances for ERC20 and DVP approvals by from-parties)
+    _approveERC20(alice, usdc, 100);
+    _approveERC20(bob, usdc, 70);
+    _approveERC20(charlie, usdc, 20);
+
+    uint256[] memory ids = _getSettlementIdArray(settlementId);
+    vm.prank(alice);
+    dvp.approveSettlements(ids);
+    vm.prank(bob);
+    dvp.approveSettlements(ids);
+    vm.prank(charlie);
+    dvp.approveSettlements(ids);
+
+    assertTrue(dvp.isSettlementApproved(settlementId));
+
+    // Snapshot balances and execute
+    uint256 aBefore = AssetToken(usdc).balanceOf(alice);
+    uint256 bBefore = AssetToken(usdc).balanceOf(bob);
+    uint256 cBefore = AssetToken(usdc).balanceOf(charlie);
+
+    dvp.executeSettlement(settlementId);
+
+    // Check net deltas: Alice -80, Bob +30, Charlie +50
+    assertEq(AssetToken(usdc).balanceOf(alice), aBefore - 80);
+    assertEq(AssetToken(usdc).balanceOf(bob), bBefore + 30);
+    assertEq(AssetToken(usdc).balanceOf(charlie), cBefore + 50);
+
+    // isSettled set
+    (,,,,, bool isSettled,,) = dvp.getSettlement(settlementId);
+    assertTrue(isSettled);
+  }
+
+  //--------------------------------------------------------------------------------
+  // computeNetRequirements Tests
+  //--------------------------------------------------------------------------------
+  function test_computeNetRequirementsForParty_ERC20Chain_NetApprovalsForDebtorOnly() public {
+    // Same USDC chain as computeNettedFlows test
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 100);
+    flows[1] = _createERC20Flow(bob, charlie, usdc, 70);
+    flows[2] = _createERC20Flow(charlie, alice, usdc, 20);
+
+    uint256 settlementId = dvp.createSettlement(flows, "USDC chain reqs", _getFutureTimestamp(7 days), false);
+
+    // Alice net outgoing = 80, Bob net = -30, Charlie net = -50
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, alice);
+      assertEq(netRequirement.ethRequiredNet, 0);
+      assertEq(netRequirement.erc20Tokens.length, 1);
+      assertEq(netRequirement.erc20Tokens[0], usdc);
+      assertEq(netRequirement.erc20NetRequired.length, 1);
+      assertEq(netRequirement.erc20NetRequired[0], 80);
+    }
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, bob);
+      assertEq(netRequirement.ethRequiredNet, 0);
+      assertEq(netRequirement.erc20Tokens.length, 0);
+      assertEq(netRequirement.erc20NetRequired.length, 0);
+    }
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, charlie);
+      assertEq(netRequirement.ethRequiredNet, 0);
+      assertEq(netRequirement.erc20Tokens.length, 0);
+      assertEq(netRequirement.erc20NetRequired.length, 0);
+    }
+  }
+
+  function test_computeNetRequirementsForParty_ETHChain_NetDepositsOnly() public {
+    // ETH chain: A->B 10, B->C 4, C->A 3 => A owes 7, B owes 0, C owes 0
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](3);
+    flows[0] = _createETHFlow(alice, bob, 10 ether);
+    flows[1] = _createETHFlow(bob, charlie, 4 ether);
+    flows[2] = _createETHFlow(charlie, alice, 3 ether);
+
+    uint256 settlementId = dvp.createSettlement(flows, "ETH chain reqs", _getFutureTimestamp(7 days), false);
+
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, alice);
+      assertEq(netRequirement.ethRequiredNet, 7 ether);
+      assertEq(netRequirement.erc20Tokens.length, 0);
+      assertEq(netRequirement.erc20NetRequired.length, 0);
+    }
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, bob);
+      assertEq(netRequirement.ethRequiredNet, 0);
+      assertEq(netRequirement.erc20Tokens.length, 0);
+      assertEq(netRequirement.erc20NetRequired.length, 0);
+    }
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, charlie);
+      assertEq(netRequirement.ethRequiredNet, 0);
+      assertEq(netRequirement.erc20Tokens.length, 0);
+      assertEq(netRequirement.erc20NetRequired.length, 0);
+    }
+  }
+
+  function test_computeNetRequirementsForParty_Mixed_IgnoresNFTAndReturnsOnlyPositiveNets() public {
+    // Flows:
+    // USDC: A->B 50, C->A 30, B->C 20 => Nets: A owes 20, C owes 10, B receives 30
+    // ETH:  A->B 2e18, B->C 2e18, C->A 3e18 => Nets: A receives 1e18, B neutral, C owes 1e18
+    // NFT:  A->C Daisy (ignored for net requirements)
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](7);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 50);
+    flows[1] = _createETHFlow(alice, bob, 2 ether);
+    flows[2] = _createNFTFlow(alice, charlie, nftCat, NFT_CAT_DAISY);
+    flows[3] = _createERC20Flow(charlie, alice, usdc, 30);
+    flows[4] = _createERC20Flow(bob, charlie, usdc, 20);
+    flows[5] = _createETHFlow(bob, charlie, 2 ether);
+    flows[6] = _createETHFlow(charlie, alice, 3 ether);
+
+    uint256 settlementId = dvp.createSettlement(flows, "mixed reqs", _getFutureTimestamp(7 days), false);
+
+    // Alice: ETH 0 (net receiver), USDC owes 20
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, alice);
+      assertEq(netRequirement.ethRequiredNet, 0, "Expected no ETH owed by alice");
+      assertEq(netRequirement.erc20Tokens.length, 1, "Expected one token owed by alice");
+      assertEq(netRequirement.erc20Tokens[0], usdc, "Expected USDC owed by alice");
+      assertEq(netRequirement.erc20NetRequired[0], 20, "Expected 20 USDC owed by alice");
+    }
+    // Bob: ETH 0, no ERC20 owed
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, bob);
+      assertEq(netRequirement.ethRequiredNet, 0, "Expected no ETH owed by bob");
+      assertEq(netRequirement.erc20Tokens.length, 0, "Expected no tokens owed by bob");
+      assertEq(netRequirement.erc20NetRequired.length, 0, "Expected no amounts owed by bob");
+    }
+    // Charlie: ETH owes 1 ether, USDC owes 10
+    {
+      DeliveryVersusPaymentV1HelperV1.NetRequirement memory netRequirement =
+        dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, charlie);
+      assertEq(netRequirement.ethRequiredNet, 1 ether, "Expected 1 ETH owed by charlie");
+      assertEq(netRequirement.erc20Tokens.length, 1, "Expected one token owed by charlie");
+      assertEq(netRequirement.erc20Tokens[0], usdc, "Expected USDC owed by charlie");
+      assertEq(netRequirement.erc20NetRequired.length, 1, "Expected one amount entry for charlie");
+      assertEq(netRequirement.erc20NetRequired[0], 10, "Expected 10 USDC owed by charlie");
+    }
+  }
+
+  function test_computeNetRequirementsForParties_Mixed_EquivalentTocomputeNetRequirementsForParty() public {
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](7);
+    flows[0] = _createERC20Flow(alice, bob, usdc, 50);
+    flows[1] = _createETHFlow(alice, bob, 2 ether);
+    flows[2] = _createNFTFlow(alice, charlie, nftCat, NFT_CAT_DAISY);
+    flows[3] = _createERC20Flow(charlie, alice, usdc, 30);
+    flows[4] = _createERC20Flow(bob, charlie, usdc, 20);
+    flows[5] = _createETHFlow(bob, charlie, 2 ether);
+    flows[6] = _createETHFlow(charlie, alice, 3 ether);
+
+    uint256 settlementId = dvp.createSettlement(flows, "mixed reqs", _getFutureTimestamp(7 days), false);
+
+    // Prepare parties list
+    address[] memory parties = new address[](3);
+    parties[0] = alice;
+    parties[1] = bob;
+    parties[2] = charlie;
+    DeliveryVersusPaymentV1HelperV1.NetRequirement[] memory netRequirements =
+      dvpHelper.computeNetRequirementsForParties(address(dvp), settlementId, parties);
+
+    assertEq(netRequirements.length, 3);
+    _assertEqNetRequirement(
+      netRequirements[0], dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, alice)
+    );
+    _assertEqNetRequirement(
+      netRequirements[1], dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, bob)
+    );
+    _assertEqNetRequirement(
+      netRequirements[2], dvpHelper.computeNetRequirementsForParty(address(dvp), settlementId, charlie)
+    );
   }
 }

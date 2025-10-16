@@ -34,13 +34,26 @@ contract DeliveryVersusPaymentV1HelperV1 {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
-
   }
 
   // A struct for returning token type information.
   struct TokenTypeInfo {
     uint8 id;
     string name;
+  }
+
+  // Asset key and metadata used for netting computation
+  struct AssetMeta {
+    address token; // token address or address(0) for ETH
+    bool isNFT; // true for ERC-721
+    uint256 id; // tokenId for NFT; 0 for fungibles (ERC20/ETH)
+  }
+
+  // Net requirement result struct
+  struct NetRequirement {
+    uint256 ethRequiredNet; // Net ETH the party must send with approveSettlements (0 if net receiver or neutral)
+    address[] erc20Tokens; // Distinct ERC20 token addresses for which approvals may be needed
+    uint256[] erc20NetRequired; // Minimal ERC20 allowance amounts (net outgoing per token; 0 entries are omitted)
   }
 
   //------------------------------------------------------------------------------
@@ -114,6 +127,127 @@ contract DeliveryVersusPaymentV1HelperV1 {
     return _getPagedSettlementIdsByType(dvpAddress, startCursor, pageSize, tokenType);
   }
 
+  /**
+   * @dev Computes an optimized netted array of flows for a given settlement.
+   * It minimizes fungible transfers per token (including ETH) by netting balances per party and
+   * pairing debtors and creditors greedily. NFTs are handled per tokenId with at most one transfer.
+   *
+   * This is a simple, ready-to-use greedy optimizer meant for clients to call directly (on-chain or via SDKs).
+   * While it typically produces a small number of transfers and good gas characteristics, for best possible
+   * optimization (e.g., strictly minimal number of fungible transfers across complex graphs), we suggest
+   * computing netting off-chain using a MILP/LP solver and then submitting the result to executeSettlementNetted.
+   *
+   * Reverts if the underlying DVP.getSettlement() call fails (e.g., non-existent settlement).
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the target settlement.
+   * @return netted An array of flows representing a netted execution plan equivalent to the original.
+   */
+  function computeNettedFlows(address dvpAddress, uint256 settlementId)
+    external
+    view
+    returns (IDeliveryVersusPaymentV1.Flow[] memory netted)
+  {
+    IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
+    // Retrieve flows (bubble up any revert from DVP)
+    (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(settlementId);
+    return this.computeNettedFlows(flows);
+  }
+
+  /**
+   * @dev Computes an optimized netted array of flows from the given flows.
+   * This function minimizes fungible transfers per token (including ETH) by netting balances per party
+   * and pairing debtors and creditors greedily. NFTs are handled per tokenId with at most one transfer.
+   *
+   * @param flows An array of flows to be optimized into a netted execution plan.
+   *
+   * @return netted An array of flows representing a netted execution plan equivalent to the original.
+   */
+  function computeNettedFlows(IDeliveryVersusPaymentV1.Flow[] memory flows)
+    external
+    pure
+    returns (IDeliveryVersusPaymentV1.Flow[] memory netted)
+  {
+    uint256 lengthFlows = flows.length;
+    // Upper bound for netted flows is original length
+    netted = new IDeliveryVersusPaymentV1.Flow[](lengthFlows);
+    uint256 outCount = 0;
+
+    // 1) Build unique parties and asset metas
+    address[] memory parties = new address[](lengthFlows * 2);
+    uint256 partyCount = 0;
+    AssetMeta[] memory assets = new AssetMeta[](lengthFlows);
+    uint256 assetCount = 0;
+
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      // Parties
+      uint256 idxFrom = _indexOfAddress(parties, partyCount, f.from);
+      if (idxFrom == type(uint256).max) {
+        parties[partyCount++] = f.from;
+      }
+      uint256 idxTo = _indexOfAddress(parties, partyCount, f.to);
+      if (idxTo == type(uint256).max) {
+        parties[partyCount++] = f.to;
+      }
+      // Assets
+      AssetMeta memory meta = AssetMeta({token: f.token, isNFT: f.isNFT, id: f.isNFT ? f.amountOrId : 0});
+      uint256 aIdx = _indexOfAssetMeta(assets, assetCount, meta);
+      if (aIdx == type(uint256).max) {
+        assets[assetCount++] = meta;
+      }
+    }
+
+    // 2) Build balances matrix [assetCount][partyCount] flattened
+    int256[] memory balances = new int256[](assetCount * partyCount);
+
+    for (uint256 i = 0; i < lengthFlows; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      AssetMeta memory meta = AssetMeta({token: f.token, isNFT: f.isNFT, id: f.isNFT ? f.amountOrId : 0});
+      uint256 k = _indexOfAssetMeta(assets, assetCount, meta);
+      uint256 pFrom = _indexOfAddress(parties, partyCount, f.from);
+      uint256 pTo = _indexOfAddress(parties, partyCount, f.to);
+      int256 delta = f.isNFT ? int256(1) : int256(f.amountOrId);
+      uint256 idxFrom = k * partyCount + pFrom;
+      uint256 idxTo = k * partyCount + pTo;
+      balances[idxFrom] -= delta;
+      balances[idxTo] += delta;
+    }
+
+    // 3) Convert balances per asset into netted flows
+    for (uint256 k = 0; k < assetCount; k++) {
+      if (assets[k].isNFT) {
+        // Find -1 and +1 parties (there should be at most one of each per tokenId)
+        address fromAddr = address(0);
+        address toAddr = address(0);
+        uint256 base = k * partyCount;
+        for (uint256 p = 0; p < partyCount; p++) {
+          int256 b = balances[base + p];
+          if (b == -1) {
+            fromAddr = parties[p];
+          } else if (b == 1) {
+            toAddr = parties[p];
+          }
+        }
+        if (fromAddr != address(0) && toAddr != address(0)) {
+          netted[outCount++] = IDeliveryVersusPaymentV1.Flow({
+            token: assets[k].token, isNFT: true, from: fromAddr, to: toAddr, amountOrId: assets[k].id
+          });
+        }
+        // else fully canceled path -> no transfer needed
+      } else {
+        outCount =
+          _appendNettedFungible(assets[k].token, parties, balances, k * partyCount, partyCount, netted, outCount);
+      }
+    }
+
+    // 4) Trim output array without using assembly (copy to exact-sized array)
+    IDeliveryVersusPaymentV1.Flow[] memory trimmed = new IDeliveryVersusPaymentV1.Flow[](outCount);
+    for (uint256 t = 0; t < outCount; t++) {
+      trimmed[t] = netted[t];
+    }
+    return trimmed;
+  }
+
   //------------------------------------------------------------------------------
   // Internal
   //------------------------------------------------------------------------------
@@ -141,8 +275,17 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
-        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
+      try dvp.getSettlement(
+        current
+      ) returns (
+        string memory,
+        uint256,
+        IDeliveryVersusPaymentV1.Flow[] memory flows,
+        IDeliveryVersusPaymentV1.Flow[] memory,
+        address,
+        bool,
+        bool,
+        bool
       ) {
         bool found = false;
         uint256 lengthFlows = flows.length;
@@ -195,8 +338,17 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
-        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
+      try dvp.getSettlement(
+        current
+      ) returns (
+        string memory,
+        uint256,
+        IDeliveryVersusPaymentV1.Flow[] memory flows,
+        IDeliveryVersusPaymentV1.Flow[] memory,
+        address,
+        bool,
+        bool,
+        bool
       ) {
         if (_matchesTokenType(flows, tokenType)) {
           temp[count] = current;
@@ -241,5 +393,192 @@ contract DeliveryVersusPaymentV1HelperV1 {
       }
     }
     return false;
+  }
+
+  // ---- Netting helpers (memory-only) ----
+  function _indexOfAddress(address[] memory arr, uint256 length, address a) internal pure returns (uint256) {
+    for (uint256 i = 0; i < length; i++) {
+      if (arr[i] == a) return i;
+    }
+    return type(uint256).max;
+  }
+
+  function _indexOfAssetMeta(AssetMeta[] memory arr, uint256 length, AssetMeta memory m)
+    internal
+    pure
+    returns (uint256)
+  {
+    for (uint256 i = 0; i < length; i++) {
+      AssetMeta memory x = arr[i];
+      if (x.token == m.token && x.isNFT == m.isNFT && x.id == m.id) {
+        return i;
+      }
+    }
+    return type(uint256).max;
+  }
+
+  // Appends netted fungible flows for a single asset into `out`, returns new outCount
+  function _appendNettedFungible(
+    address token,
+    address[] memory parties,
+    int256[] memory balances,
+    uint256 baseIndex, // offset into balances for this asset (k * partyCount)
+    uint256 partyCount,
+    IDeliveryVersusPaymentV1.Flow[] memory out,
+    uint256 outCount
+  ) internal pure returns (uint256) {
+    uint256[] memory negIdx = new uint256[](partyCount);
+    uint256[] memory posIdx = new uint256[](partyCount);
+    uint256[] memory negAmt = new uint256[](partyCount);
+    uint256[] memory posAmt = new uint256[](partyCount);
+    uint256 ni = 0;
+    uint256 pj = 0;
+
+    // Split into negative and positive balances
+    // and record indices of parties so we can create the flows later
+    for (uint256 p = 0; p < partyCount; p++) {
+      int256 b = balances[baseIndex + p];
+      if (b < 0) {
+        negIdx[ni] = p;
+        negAmt[ni] = uint256(-b);
+        ni++;
+      } else if (b > 0) {
+        posIdx[pj] = p;
+        posAmt[pj] = uint256(b);
+        pj++;
+      }
+    }
+    /**
+     * Greedily match negative and positive balances
+     * This is not guaranteed to produce the minimal number of transfers in all cases,
+     * but it is simple and typically produces good results.
+     * For best possible optimization (e.g., strictly minimal number of transfers across complex graphs),
+     * we suggest computing netting off-chain using a MILP/LP solver and then submitting
+     * the result to createSettlement.
+     *
+     * Here is how the greedy algorithm works:
+     * - We have two lists: one of parties with negative balances (debtors) and one of parties with positive balances (creditors).
+     * - We iterate through both lists, matching debtors to creditors.
+     * - For each match, we create a flow for the minimum of the debtor's negative
+     * and creditor's positive balance. We then adjust the balances accordingly.
+     * - If a debtor's balance is fully settled, we move to the next debtor.
+     * - If a creditor's balance is fully settled, we move to the next creditor.
+     * - This continues until all debtors or all creditors are settled.
+     *
+     */
+    uint256 iNeg = 0;
+    uint256 jPos = 0;
+    while (iNeg < ni && jPos < pj) {
+      uint256 x = negAmt[iNeg];
+      uint256 y = posAmt[jPos];
+      uint256 amt = x < y ? x : y;
+      if (amt > 0) {
+        out[outCount++] = IDeliveryVersusPaymentV1.Flow({
+          token: token, isNFT: false, from: parties[negIdx[iNeg]], to: parties[posIdx[jPos]], amountOrId: amt
+        });
+      }
+      if (x <= y) {
+        iNeg++;
+        if (x < y) {
+          posAmt[jPos] = y - x;
+        } else {
+          jPos++;
+        }
+      } else {
+        jPos++;
+        negAmt[iNeg] = x - y;
+      }
+    }
+    return outCount;
+  }
+
+  /**
+   * @notice Compute minimal per-party requirements for a given settlement.
+   * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan (as enforced by DVP.executeSettlementNetted).
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * Reverts if the underlying DVP.getSettlement() call fails.
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the settlement.
+   * @param party Address of the party to compute requirements for.
+   * @return result NetRequirement data struct with ETH and ERC20 requirements.
+   */
+  function computeNetRequirementsForParty(address dvpAddress, uint256 settlementId, address party)
+    external
+    view
+    returns (NetRequirement memory result)
+  {
+    IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
+    return _computeNetRequirementsForParty(netted, party);
+  }
+  /**
+   * @notice Compute minimal per-party requirements for a given settlement for an array of parties.
+   * @dev Returns the net ETH each given party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan (as enforced by DVP.executeSettlementNetted).
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * Reverts if the underlying DVP.getSettlement() call fails.
+   * @param dvpAddress Address of the DVP contract.
+   * @param settlementId ID of the settlement.
+   * @param parties Array of addresses of the parties to compute requirements for.
+   * @return results Array of NetRequirement data structs with ETH and ERC20 requirements for each party.
+   */
+
+  function computeNetRequirementsForParties(address dvpAddress, uint256 settlementId, address[] calldata parties)
+    external
+    view
+    returns (NetRequirement[] memory results)
+  {
+    IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
+
+    results = new NetRequirement[](parties.length);
+    for (uint256 i = 0; i < parties.length; i++) {
+      results[i] = _computeNetRequirementsForParty(netted, parties[i]);
+    }
+  }
+
+  /**
+   * @notice Compute net requirements for a party from netted flows.
+   * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan.
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * @param flows Array of netted flows to analyze.
+   * @param party Address of the party to compute requirements for.
+   * @return result NetRequirement data struct with ETH and ERC20 requirements.
+   */
+  function _computeNetRequirementsForParty(IDeliveryVersusPaymentV1.Flow[] memory flows, address party)
+    internal
+    pure
+    returns (NetRequirement memory result)
+  {
+    for (uint256 i = 0; i < flows.length; i++) {
+      IDeliveryVersusPaymentV1.Flow memory f = flows[i];
+      if (f.from == party) {
+        if (f.token == address(0)) {
+          // ETH leg
+          result.ethRequiredNet += f.amountOrId;
+        } else if (!f.isNFT) {
+          // ERC20 leg: accumulate per token net (outgoing only)
+          uint256 idx = _indexOfAddress(result.erc20Tokens, result.erc20Tokens.length, f.token);
+          if (idx == type(uint256).max) {
+            // New token, expand arrays
+            uint256 oldLen = result.erc20Tokens.length;
+            address[] memory newTokens = new address[](oldLen + 1);
+            uint256[] memory newAmounts = new uint256[](oldLen + 1);
+            for (uint256 j = 0; j < oldLen; j++) {
+              newTokens[j] = result.erc20Tokens[j];
+              newAmounts[j] = result.erc20NetRequired[j];
+            }
+            newTokens[oldLen] = f.token;
+            newAmounts[oldLen] = f.amountOrId;
+            result.erc20Tokens = newTokens;
+            result.erc20NetRequired = newAmounts;
+          } else {
+            // Existing token, accumulate
+            result.erc20NetRequired[idx] += f.amountOrId;
+          }
+        }
+        // NFTs ignored for this computation
+      }
+    }
   }
 }

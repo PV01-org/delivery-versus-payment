@@ -34,6 +34,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
+
   }
 
   // A struct for returning token type information.
@@ -65,12 +66,12 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return settlementIds An array of matching settlement IDs (up to pageSize in length).
    * @return nextCursor The settlement ID to use as the startCursor on the next call (or 0 if finished).
    */
-  function getSettlementsByToken(
-    address dvpAddress,
-    address token,
-    uint256 startCursor,
-    uint256 pageSize
-  ) external view validPageSize(pageSize) returns (uint256[] memory settlementIds, uint256 nextCursor) {
+  function getSettlementsByToken(address dvpAddress, address token, uint256 startCursor, uint256 pageSize)
+    external
+    view
+    validPageSize(pageSize)
+    returns (uint256[] memory settlementIds, uint256 nextCursor)
+  {
     // true indicates filtering on flows' token field.
     return _getPagedSettlementIds(dvpAddress, startCursor, pageSize, true, token);
   }
@@ -104,12 +105,12 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return settlementIds An array of matching settlement IDs (up to pageSize in length).
    * @return nextCursor The settlement ID to use as the startCursor on the next call (or 0 if finished).
    */
-  function getSettlementsByTokenType(
-    address dvpAddress,
-    TokenType tokenType,
-    uint256 startCursor,
-    uint256 pageSize
-  ) external view validPageSize(pageSize) returns (uint256[] memory settlementIds, uint256 nextCursor) {
+  function getSettlementsByTokenType(address dvpAddress, TokenType tokenType, uint256 startCursor, uint256 pageSize)
+    external
+    view
+    validPageSize(pageSize)
+    returns (uint256[] memory settlementIds, uint256 nextCursor)
+  {
     return _getPagedSettlementIdsByType(dvpAddress, startCursor, pageSize, tokenType);
   }
 
@@ -141,11 +142,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
 
     while (current > 0 && count < pageSize) {
       try dvp.getSettlement(current) returns (
-        string memory,
-        uint256,
-        IDeliveryVersusPaymentV1.Flow[] memory flows,
-        bool,
-        bool
+        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
       ) {
         bool found = false;
         uint256 lengthFlows = flows.length;
@@ -187,12 +184,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return matchingIds An array of matching settlement IDs (of length <= pageSize).
    * @return nextCursor The settlement ID from which to continue in the next call (or 0 if there are no more).
    */
-  function _getPagedSettlementIdsByType(
-    address dvpAddress,
-    uint256 startCursor,
-    uint256 pageSize,
-    TokenType tokenType
-  ) internal view returns (uint256[] memory matchingIds, uint256 nextCursor) {
+  function _getPagedSettlementIdsByType(address dvpAddress, uint256 startCursor, uint256 pageSize, TokenType tokenType)
+    internal
+    view
+    returns (uint256[] memory matchingIds, uint256 nextCursor)
+  {
     IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
     uint256 current = startCursor == 0 ? dvp.settlementIdCounter() : startCursor;
     uint256[] memory temp = new uint256[](pageSize);
@@ -200,11 +196,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
 
     while (current > 0 && count < pageSize) {
       try dvp.getSettlement(current) returns (
-        string memory,
-        uint256,
-        IDeliveryVersusPaymentV1.Flow[] memory flows,
-        bool,
-        bool
+        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
       ) {
         if (_matchesTokenType(flows, tokenType)) {
           temp[count] = current;
@@ -228,10 +220,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @param tokenType The token type filter.
    * @return True if at least one flow matches the token type, false otherwise.
    */
-  function _matchesTokenType(
-    IDeliveryVersusPaymentV1.Flow[] memory flows,
-    TokenType tokenType
-  ) internal pure returns (bool) {
+  function _matchesTokenType(IDeliveryVersusPaymentV1.Flow[] memory flows, TokenType tokenType)
+    internal
+    pure
+    returns (bool)
+  {
     uint256 lengthFlows = flows.length;
     for (uint256 i = 0; i < lengthFlows; i++) {
       // For Ether, the token address must be zero.

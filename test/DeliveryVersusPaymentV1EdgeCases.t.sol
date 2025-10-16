@@ -47,7 +47,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     dvp.approveSettlements{value: 1 ether}(settlementIds);
 
     // Approval should have stuck
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
   }
 
@@ -177,10 +177,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Execution should fail due to insufficient allowance
     vm.expectRevert(
       abi.encodeWithSelector(
-        IERC20Errors.ERC20InsufficientAllowance.selector,
-        address(dvp),
-        0,
-        TOKEN_AMOUNT_SMALL_6_DECIMALS
+        IERC20Errors.ERC20InsufficientAllowance.selector, address(dvp), 0, TOKEN_AMOUNT_SMALL_6_DECIMALS
       )
     );
     dvp.executeSettlement(settlementId);
@@ -270,7 +267,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -300,7 +297,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
+    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -367,10 +364,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Use setApprovalForAll instead of individual approval
     _approveAllNFTs(alice, nftCat);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertEq(tokenStatuses.length, 1);
     assertEq(tokenStatuses[0].amountOrIdApprovedForDvp, NFT_CAT_DAISY);
@@ -400,7 +394,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, "Large Settlement", cutoff, false);
 
-    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, , ) = dvp.getSettlement(settlementId);
+    (,, IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,,) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, numFlows);
   }
 
@@ -426,7 +420,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     // Verify all are approved
     for (uint256 i = 0; i < numSettlements; i++) {
-      (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementIds[i], alice);
+      (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementIds[i], alice);
       assertTrue(isApproved);
     }
   }

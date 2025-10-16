@@ -74,22 +74,13 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   event SettlementCreated(uint256 indexed settlementId, address indexed creator);
   event SettlementExecuted(uint256 indexed settlementId, address indexed executor);
   event SettlementExecutionFailedReason(
-    uint256 indexed settlementId,
-    address indexed executor,
-    bool autoExecuted,
-    string reason
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, string reason
   );
   event SettlementExecutionFailedPanic(
-    uint256 indexed settlementId,
-    address indexed executor,
-    bool autoExecuted,
-    uint256 errorCode
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, uint256 errorCode
   );
   event SettlementExecutionFailedOther(
-    uint256 indexed settlementId,
-    address indexed executor,
-    bool autoExecuted,
-    bytes lowLevelData
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, bytes lowLevelData
   );
   event SettlementApprovalRevoked(uint256 indexed settlementId, address indexed party);
 
@@ -371,9 +362,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @dev Retrieves settlement details.
    * @param settlementId The id of the settlement to retrieve.
    */
-  function getSettlement(
-    uint256 settlementId
-  )
+  function getSettlement(uint256 settlementId)
     external
     view
     returns (
@@ -410,10 +399,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementId The id of the settlement to check.
    * @param party The party to check.
    */
-  function getSettlementPartyStatus(
-    uint256 settlementId,
-    address party
-  )
+  function getSettlementPartyStatus(uint256 settlementId, address party)
     external
     view
     returns (bool isApproved, uint256 etherRequired, uint256 etherDeposited, TokenStatus[] memory tokenStatuses)
@@ -525,10 +511,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @return etherRequired The total ETH required from the party.
    * @return etherDeposited The total ETH deposited by the party.
    */
-  function _getPartyEthStats(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (uint256 etherRequired, uint256 etherDeposited) {
+  function _getPartyEthStats(Settlement storage settlement, address party)
+    internal
+    view
+    returns (uint256 etherRequired, uint256 etherDeposited)
+  {
     uint256 lengthFlows = settlement.flows.length;
     for (uint256 i = 0; i < lengthFlows; i++) {
       Flow storage flow = settlement.flows[i];
@@ -547,10 +534,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -565,10 +549,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           tokenAddress: f.token,
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
-          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this) ||
-            nft.isApprovedForAll(party, address(this))
-            ? f.amountOrId
-            : 0,
+          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
+            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {

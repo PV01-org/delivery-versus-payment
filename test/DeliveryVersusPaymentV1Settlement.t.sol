@@ -437,6 +437,66 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.executeSettlementInner(address(this), NOT_A_SETTLEMENT_ID);
   }
 
+  function test_executeSettlement_WithERC20TransferFailurePanic_Reverts() public {
+    // Manual execution should re-throw panic errors (division by zero in this case)
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(dave, alice, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_PANIC);
+    uint128 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
+
+    // Approve
+    _approveERC20(dave, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_PANIC);
+
+    uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
+    vm.prank(dave);
+    dvp.approveSettlements(settlementIds);
+
+    // Manual execution should re-throw the panic error - we just expect it to revert
+    // The SettlementExecutionFailedPanic event is emitted before the panic is re-thrown
+    // but we can't easily capture both the event and the panic in one test
+    vm.expectRevert();
+    dvp.executeSettlement(settlementId);
+  }
+
+  function test_executeSettlement_WithERC20TransferFailureReasonString_Reverts() public {
+    // Manual execution should re-throw reason string errors
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(dave, alice, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_REASON_STRING);
+    uint128 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
+
+    // Approve
+    _approveERC20(dave, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_REASON_STRING);
+
+    uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
+    vm.prank(dave);
+    dvp.approveSettlements(settlementIds);
+
+    // Manual execution should emit event then re-throw the error with reason string
+    vm.expectRevert("AssetTokenThatReverts: transferFrom is disabled");
+    dvp.executeSettlement(settlementId);
+  }
+
+  function test_executeSettlement_WithERC20TransferFailureNoMessage_Reverts() public {
+    // Manual execution should re-throw low-level errors (custom errors, no message, etc)
+    IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
+    flows[0] = _createERC20Flow(dave, alice, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_NO_MESSAGE);
+    uint128 cutoff = _getFutureTimestamp(7 days);
+    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
+
+    // Approve
+    _approveERC20(dave, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_NO_MESSAGE);
+
+    uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
+    vm.prank(dave);
+    dvp.approveSettlements(settlementIds);
+
+    // Manual execution should emit event then re-throw the error
+    // Expect a revert with empty data (assembly revert(0,0))
+    vm.expectRevert();
+    dvp.executeSettlement(settlementId);
+  }
+
   //--------------------------------------------------------------------------------
   // revokeApprovals Tests
   //--------------------------------------------------------------------------------

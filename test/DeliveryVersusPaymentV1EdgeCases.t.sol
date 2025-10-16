@@ -36,7 +36,8 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit DeliveryVersusPaymentV1.SettlementAutoExecutionFailedOther({
+    emit DeliveryVersusPaymentV1
+      .SettlementAutoExecutionFailedOther({
       settlementId: settlementId,
       executor: alice,
       lowLevelData: abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector)

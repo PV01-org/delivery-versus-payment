@@ -64,19 +64,14 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     (
       IDeliveryVersusPaymentV1.Flow[] memory flows,
       IDeliveryVersusPaymentV1.Flow[] memory nettedFlows,
-      uint256 cutoff,
-      ,
-      ,
+      uint256 cutoff,,,
     ) = _createMixedFlowsForNetting();
 
     uint256 settlementId = dvp.createSettlement(flows, nettedFlows, SETTLEMENT_REF, cutoff, true);
 
     (
-      ,
-      ,
-      ,
-      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
-      ,
+      ,,,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff
@@ -99,11 +94,8 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     uint256 settlementId = dvp.createSettlement(flows, emptyFlows, SETTLEMENT_REF, cutoff, true);
 
     (
-      ,
-      ,
-      ,
-      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
-      ,
+      ,,,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,,
       bool isSettled,
       bool isAutoSettled,
       bool useNettingOff
@@ -215,13 +207,9 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     uint256 settlementId = dvp.createSettlement(flows, netted, _ref("zero_nft_id"), _getFutureTimestamp(3 days), false);
 
     (
-      ,
-      ,
+      ,,
       IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,
-      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
-      ,
-      ,
-      ,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,,,,
     ) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, 1);
     assertEq(retrievedNettedFlows.length, 1);

@@ -34,7 +34,6 @@ contract DeliveryVersusPaymentV1HelperV1 {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
-
   }
 
   // A struct for returning token type information.
@@ -231,11 +230,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
         }
         if (fromAddr != address(0) && toAddr != address(0)) {
           netted[outCount++] = IDeliveryVersusPaymentV1.Flow({
-            token: assets[k].token,
-            isNFT: true,
-            from: fromAddr,
-            to: toAddr,
-            amountOrId: assets[k].id
+            token: assets[k].token, isNFT: true, from: fromAddr, to: toAddr, amountOrId: assets[k].id
           });
         }
         // else fully canceled path -> no transfer needed
@@ -280,7 +275,9 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
+      try dvp.getSettlement(
+        current
+      ) returns (
         string memory,
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
@@ -341,7 +338,9 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
+      try dvp.getSettlement(
+        current
+      ) returns (
         string memory,
         uint256,
         IDeliveryVersusPaymentV1.Flow[] memory flows,
@@ -475,11 +474,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
       uint256 amt = x < y ? x : y;
       if (amt > 0) {
         out[outCount++] = IDeliveryVersusPaymentV1.Flow({
-          token: token,
-          isNFT: false,
-          from: parties[negIdx[iNeg]],
-          to: parties[posIdx[jPos]],
-          amountOrId: amt
+          token: token, isNFT: false, from: parties[negIdx[iNeg]], to: parties[posIdx[jPos]], amountOrId: amt
         });
       }
       if (x <= y) {

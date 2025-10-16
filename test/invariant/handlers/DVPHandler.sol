@@ -179,11 +179,7 @@ contract DVPHandler is Test {
     address to = actors[toIndex];
 
     return IDeliveryVersusPaymentV1.Flow({
-      token: address(0),
-      isNFT: false,
-      from: from,
-      to: to,
-      amountOrId: bound(seed, 0.1 ether, 10 ether)
+      token: address(0), isNFT: false, from: from, to: to, amountOrId: bound(seed, 0.1 ether, 10 ether)
     });
   }
 
@@ -197,7 +193,9 @@ contract DVPHandler is Test {
 
   /// @dev Calculates ETH required for msg.sender to approve a settlement
   function calculateEthRequiredForMsgSender(uint256 settlementId) external view returns (uint256) {
-    try dvp.getSettlement(settlementId) returns (
+    try dvp.getSettlement(
+      settlementId
+    ) returns (
       string memory,
       uint256,
       IDeliveryVersusPaymentV1.Flow[] memory flows,

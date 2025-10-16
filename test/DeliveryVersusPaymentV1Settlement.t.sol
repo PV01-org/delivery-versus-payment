@@ -32,10 +32,8 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement party status for Alice
-    (bool isApproved, uint256 etherRequired, uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (bool isApproved, uint256 etherRequired, uint256 etherDeposited,) =
+      dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertTrue(isApproved);
     assertEq(etherRequired, 0);
@@ -62,10 +60,8 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements{value: aliceETHRequired}(settlementIds);
 
     // Check Alice's status
-    (bool isApproved, uint256 etherRequired, uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (bool isApproved, uint256 etherRequired, uint256 etherDeposited,) =
+      dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertTrue(isApproved);
     assertEq(etherRequired, aliceETHRequired);
@@ -165,7 +161,9 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     uint256 correctAmount = TOKEN_AMOUNT_SMALL_18_DECIMALS;
     uint256 incorrectAmount = correctAmount / 2;
 
-    vm.expectRevert(abi.encodeWithSelector(DeliveryVersusPaymentV1.IncorrectETHAmount.selector, incorrectAmount, correctAmount));
+    vm.expectRevert(
+      abi.encodeWithSelector(DeliveryVersusPaymentV1.IncorrectETHAmount.selector, incorrectAmount, correctAmount)
+    );
     vm.prank(alice);
     dvp.approveSettlements{value: incorrectAmount}(settlementIds);
   }
@@ -232,7 +230,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is not executed yet
-    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (,,,,, bool isSettled,,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
 
     // Bob approves last - triggers auto-execution
@@ -242,7 +240,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements(settlementIds);
 
     // Check settlement is executed
-    (, , , , , isSettled, , ) = dvp.getSettlement(settlementId);
+    (,,,,, isSettled,,) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -262,7 +260,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.prank(dave);
     dvp.approveSettlements(settlementIds);
 
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, dave);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, dave);
     assertTrue(isApproved, "Approval should still be retained after auto-execution failure");
   }
 
@@ -282,7 +280,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.prank(dave);
     dvp.approveSettlements(settlementIds);
 
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, dave);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, dave);
     assertTrue(isApproved, "Approval should still be retained after auto-execution failure");
   }
 
@@ -323,7 +321,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     assertEq(daiToken.balanceOf(charlie), charlieDAIBefore + TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
     // Check settlement is marked as settled
-    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (,,,,, bool isSettled,,) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -386,7 +384,14 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_MixedWithNettingOff_SucceedsAndRefundsETH() public {
     // Arrange
-    (IDeliveryVersusPaymentV1.Flow[] memory flows, IDeliveryVersusPaymentV1.Flow[] memory nettedFlows, uint256 cutoff, uint256 ethA, uint256 ethB, uint256 ethC) = _createMixedFlowsForNetting();
+    (
+      IDeliveryVersusPaymentV1.Flow[] memory flows,
+      IDeliveryVersusPaymentV1.Flow[] memory nettedFlows,
+      uint256 cutoff,
+      uint256 ethA,
+      uint256 ethB,
+      uint256 ethC
+    ) = _createMixedFlowsForNetting();
 
     uint256 settlementId = dvp.createSettlement(flows, nettedFlows, SETTLEMENT_REF, cutoff, false);
 
@@ -447,7 +452,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     assertEq(ethDepC, 0);
 
     // isSettled
-    (, , , , , bool isSettled, , ) = dvp.getSettlement(settlementId);
+    (,,,,, bool isSettled,,) = dvp.getSettlement(settlementId);
     assertTrue(isSettled);
   }
 
@@ -525,7 +530,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.approveSettlements{value: aliceETHRequired}(settlementIds);
 
     // Verify approval and deposit
-    (bool isApproved, , uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved,, uint256 etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
     assertEq(etherDeposited, aliceETHRequired);
 
@@ -538,7 +543,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.revokeApprovals(settlementIds);
 
     // Check approval is revoked and ETH refunded
-    (isApproved, , etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (isApproved,, etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertFalse(isApproved);
     assertEq(etherDeposited, 0);
     assertEq(alice.balance, aliceETHBefore); // Should get ETH back (minus gas)
@@ -611,7 +616,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     dvp.withdrawETH(settlementId);
 
     // Check ETH is returned
-    (, , uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (,, uint256 etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertEq(etherDeposited, 0);
   }
 
@@ -677,9 +682,9 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 20);
 
-    uint256 settlementId = dvp.createSettlement(flows, _ref('set_netted_flows'), _getFutureTimestamp(1), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("set_netted_flows"), _getFutureTimestamp(1), false);
 
-    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+    (,,, nettedFlows,,,, useNettingOff) = dvp.getSettlement(settlementId);
 
     assertEq(nettedFlows.length, 0);
     assertFalse(useNettingOff);
@@ -690,7 +695,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Act
     dvp.setNettedFlows(settlementId, nettedFlows);
 
-    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+    (,,, nettedFlows,,,, useNettingOff) = dvp.getSettlement(settlementId);
 
     // Assert
     assertEq(nettedFlows.length, 1);
@@ -706,7 +711,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     flows[1] = _createERC20Flow(alice, bob, usdc, 20);
     flows[2] = _createERC20Flow(alice, bob, usdc, 40);
 
-    uint256 settlementId = dvp.createSettlement(flows, _ref('set_netted_flows'), _getFutureTimestamp(1), false);
+    uint256 settlementId = dvp.createSettlement(flows, _ref("set_netted_flows"), _getFutureTimestamp(1), false);
 
     IDeliveryVersusPaymentV1.Flow[] memory nettedFlows1 = new IDeliveryVersusPaymentV1.Flow[](2);
     nettedFlows1[0] = _createERC20Flow(alice, bob, usdc, 50);
@@ -714,7 +719,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     dvp.setNettedFlows(settlementId, nettedFlows1);
 
-    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+    (,,, nettedFlows,,,, useNettingOff) = dvp.getSettlement(settlementId);
 
     assertEq(nettedFlows.length, 2);
     assertTrue(useNettingOff);
@@ -724,20 +729,20 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     dvp.setNettedFlows(settlementId, nettedFlows2);
 
-    ( , , , nettedFlows, , , , useNettingOff) = dvp.getSettlement(settlementId);
+    (,,, nettedFlows,,,, useNettingOff) = dvp.getSettlement(settlementId);
 
     assertEq(nettedFlows.length, 1);
     assertTrue(useNettingOff);
   }
 
   function test_setNettedFlows_RevertsIfSettlementDoesNotExist() public {
-      // Arrange
-      IDeliveryVersusPaymentV1.Flow[] memory nettedFlows = new IDeliveryVersusPaymentV1.Flow[](1);
-      nettedFlows[0] = _createERC20Flow(alice, bob, usdc, 20);
+    // Arrange
+    IDeliveryVersusPaymentV1.Flow[] memory nettedFlows = new IDeliveryVersusPaymentV1.Flow[](1);
+    nettedFlows[0] = _createERC20Flow(alice, bob, usdc, 20);
 
-      // Act & Assert
-      vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
-      dvp.setNettedFlows(1, nettedFlows);  // No settlement with ID 1
+    // Act & Assert
+    vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
+    dvp.setNettedFlows(1, nettedFlows); // No settlement with ID 1
   }
 
   function test_setNettedFlows_RevertsIfSettlementAlreadyExecuted() public {
@@ -755,7 +760,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     // Act & Assert
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementAlreadyExecuted.selector);
-    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+    dvp.setNettedFlows(settlementId, flows); // using original flows as dummy netted flows
   }
 
   function test_setNettedFlows_RevertsIfCutoffDatePassed() public {
@@ -769,9 +774,10 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Act & Assert
     _advanceTime(2 days);
     vm.expectRevert(DeliveryVersusPaymentV1.CutoffDatePassed.selector);
-    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+    dvp.setNettedFlows(settlementId, flows); // using original flows as dummy netted flows
   }
-//
+  //
+
   function test_setNettedFlows_revertsIfCallerIsNotCreator() public {
     // Arrange
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
@@ -783,7 +789,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Act & Assert
     vm.prank(bob); // Bob is not the creator
     vm.expectRevert(DeliveryVersusPaymentV1.CallerMustBeSettlementCreator.selector);
-    dvp.setNettedFlows(settlementId, flows);  // using original flows as dummy netted flows
+    dvp.setNettedFlows(settlementId, flows); // using original flows as dummy netted flows
   }
 
   function test_setNettedFlows_RevertsIfNettedFlowsNotEquivalent() public {
@@ -800,5 +806,4 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     vm.expectRevert(DeliveryVersusPaymentV1.NotEquivalentNettedFlows.selector);
     dvp.setNettedFlows(settlementId, nettedFlows);
   }
-
 }

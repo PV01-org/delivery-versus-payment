@@ -21,7 +21,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
     vm.expectEmit(true, true, false, true);
     emit DeliveryVersusPaymentV1.SettlementCreated(1, address(this));
 
-//    vm.prank(creator);
+    //    vm.prank(creator);
     uint256 settlementId = dvp.createSettlement(flows, refInput, cutoff, false);
 
     assertEq(settlementId, 1);
@@ -55,17 +55,32 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , , , bool isSettled, bool isAutoSettled, ) = dvp.getSettlement(settlementId);
+    (,,,,, bool isSettled, bool isAutoSettled,) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
   }
 
   function test_createSettlement_WithNettedFlows_Succeeds() public {
-    (IDeliveryVersusPaymentV1.Flow[] memory flows, IDeliveryVersusPaymentV1.Flow[] memory nettedFlows, uint256 cutoff, , , ) = _createMixedFlowsForNetting();
+    (
+      IDeliveryVersusPaymentV1.Flow[] memory flows,
+      IDeliveryVersusPaymentV1.Flow[] memory nettedFlows,
+      uint256 cutoff,
+      ,
+      ,
+    ) = _createMixedFlowsForNetting();
 
     uint256 settlementId = dvp.createSettlement(flows, nettedFlows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
+    (
+      ,
+      ,
+      ,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
+      ,
+      bool isSettled,
+      bool isAutoSettled,
+      bool useNettingOff
+    ) = dvp.getSettlement(settlementId);
 
     assertEq(nettedFlows.length, retrievedNettedFlows.length);
     assertFalse(isSettled);
@@ -83,7 +98,16 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, emptyFlows, SETTLEMENT_REF, cutoff, true);
 
-    (, , , IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , bool isSettled, bool isAutoSettled, bool useNettingOff) = dvp.getSettlement(settlementId);
+    (
+      ,
+      ,
+      ,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
+      ,
+      bool isSettled,
+      bool isAutoSettled,
+      bool useNettingOff
+    ) = dvp.getSettlement(settlementId);
     assertEq(retrievedNettedFlows.length, 0);
     assertFalse(isSettled);
     assertTrue(isAutoSettled);
@@ -190,7 +214,15 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     uint256 settlementId = dvp.createSettlement(flows, netted, _ref("zero_nft_id"), _getFutureTimestamp(3 days), false);
 
-    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows, , , , ) = dvp.getSettlement(settlementId);
+    (
+      ,
+      ,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,
+      IDeliveryVersusPaymentV1.Flow[] memory retrievedNettedFlows,
+      ,
+      ,
+      ,
+    ) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, 1);
     assertEq(retrievedNettedFlows.length, 1);
     assertEq(retrievedFlows[0].amountOrId, 0);

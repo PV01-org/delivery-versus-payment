@@ -157,29 +157,27 @@ contract TestDvpBase is Test {
   }
 
   // Helper functions for creating flows
-  function _createERC20Flow(
-    address from,
-    address to,
-    address token,
-    uint256 amount
-  ) internal pure returns (IDeliveryVersusPaymentV1.Flow memory) {
+  function _createERC20Flow(address from, address to, address token, uint256 amount)
+    internal
+    pure
+    returns (IDeliveryVersusPaymentV1.Flow memory)
+  {
     return IDeliveryVersusPaymentV1.Flow({token: token, isNFT: false, from: from, to: to, amountOrId: amount});
   }
 
-  function _createETHFlow(
-    address from,
-    address to,
-    uint256 amount
-  ) internal pure returns (IDeliveryVersusPaymentV1.Flow memory) {
+  function _createETHFlow(address from, address to, uint256 amount)
+    internal
+    pure
+    returns (IDeliveryVersusPaymentV1.Flow memory)
+  {
     return IDeliveryVersusPaymentV1.Flow({token: address(0), isNFT: false, from: from, to: to, amountOrId: amount});
   }
 
-  function _createNFTFlow(
-    address from,
-    address to,
-    address token,
-    uint256 tokenId
-  ) internal pure returns (IDeliveryVersusPaymentV1.Flow memory) {
+  function _createNFTFlow(address from, address to, address token, uint256 tokenId)
+    internal
+    pure
+    returns (IDeliveryVersusPaymentV1.Flow memory)
+  {
     return IDeliveryVersusPaymentV1.Flow({token: token, isNFT: true, from: from, to: to, amountOrId: tokenId});
   }
 
@@ -221,7 +219,14 @@ contract TestDvpBase is Test {
   function _createMixedFlowsForNetting()
     internal
     view
-    returns (IDeliveryVersusPaymentV1.Flow[] memory flows, IDeliveryVersusPaymentV1.Flow[] memory nettedFlows, uint256 cutoff, uint256 ethA, uint256 ethB, uint256 ethC)
+    returns (
+      IDeliveryVersusPaymentV1.Flow[] memory flows,
+      IDeliveryVersusPaymentV1.Flow[] memory nettedFlows,
+      uint256 cutoff,
+      uint256 ethA,
+      uint256 ethB,
+      uint256 ethC
+    )
   {
     // Original flows (6 total):
     // ETH:  A->B 10e18, B->C 4e18, C->A 3e18

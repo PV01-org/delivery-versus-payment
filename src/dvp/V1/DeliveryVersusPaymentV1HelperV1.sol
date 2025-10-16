@@ -2,14 +2,13 @@
 pragma solidity 0.8.30;
 
 /**
-██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
-██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
-██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
-██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
-██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
-╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
+ * ██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
+ * ██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
+ * ██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
+ * ██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
+ * ██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
+ * ╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
  */
-
 import "./IDeliveryVersusPaymentV1.sol";
 
 /**
@@ -35,6 +34,7 @@ contract DeliveryVersusPaymentV1HelperV1 {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
+
   }
 
   // A struct for returning token type information.
@@ -46,15 +46,15 @@ contract DeliveryVersusPaymentV1HelperV1 {
   // Asset key and metadata used for netting computation
   struct AssetMeta {
     address token; // token address or address(0) for ETH
-    bool isNFT;    // true for ERC-721
-    uint256 id;    // tokenId for NFT; 0 for fungibles (ERC20/ETH)
+    bool isNFT; // true for ERC-721
+    uint256 id; // tokenId for NFT; 0 for fungibles (ERC20/ETH)
   }
 
   // Net requirement result struct
   struct NetRequirement {
-    uint256 ethRequiredNet;          // Net ETH the party must send with approveSettlements (0 if net receiver or neutral)
-    address[] erc20Tokens;           // Distinct ERC20 token addresses for which approvals may be needed
-    uint256[] erc20NetRequired;      // Minimal ERC20 allowance amounts (net outgoing per token; 0 entries are omitted)
+    uint256 ethRequiredNet; // Net ETH the party must send with approveSettlements (0 if net receiver or neutral)
+    address[] erc20Tokens; // Distinct ERC20 token addresses for which approvals may be needed
+    uint256[] erc20NetRequired; // Minimal ERC20 allowance amounts (net outgoing per token; 0 entries are omitted)
   }
 
   //------------------------------------------------------------------------------
@@ -80,12 +80,12 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return settlementIds An array of matching settlement IDs (up to pageSize in length).
    * @return nextCursor The settlement ID to use as the startCursor on the next call (or 0 if finished).
    */
-  function getSettlementsByToken(
-    address dvpAddress,
-    address token,
-    uint256 startCursor,
-    uint256 pageSize
-  ) external view validPageSize(pageSize) returns (uint256[] memory settlementIds, uint256 nextCursor) {
+  function getSettlementsByToken(address dvpAddress, address token, uint256 startCursor, uint256 pageSize)
+    external
+    view
+    validPageSize(pageSize)
+    returns (uint256[] memory settlementIds, uint256 nextCursor)
+  {
     // true indicates filtering on flows' token field.
     return _getPagedSettlementIds(dvpAddress, startCursor, pageSize, true, token);
   }
@@ -119,12 +119,12 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return settlementIds An array of matching settlement IDs (up to pageSize in length).
    * @return nextCursor The settlement ID to use as the startCursor on the next call (or 0 if finished).
    */
-  function getSettlementsByTokenType(
-    address dvpAddress,
-    TokenType tokenType,
-    uint256 startCursor,
-    uint256 pageSize
-  ) external view validPageSize(pageSize) returns (uint256[] memory settlementIds, uint256 nextCursor) {
+  function getSettlementsByTokenType(address dvpAddress, TokenType tokenType, uint256 startCursor, uint256 pageSize)
+    external
+    view
+    validPageSize(pageSize)
+    returns (uint256[] memory settlementIds, uint256 nextCursor)
+  {
     return _getPagedSettlementIdsByType(dvpAddress, startCursor, pageSize, tokenType);
   }
 
@@ -143,13 +143,14 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @param settlementId ID of the target settlement.
    * @return netted An array of flows representing a netted execution plan equivalent to the original.
    */
-  function computeNettedFlows(
-    address dvpAddress,
-    uint256 settlementId
-  ) external view returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
+  function computeNettedFlows(address dvpAddress, uint256 settlementId)
+    external
+    view
+    returns (IDeliveryVersusPaymentV1.Flow[] memory netted)
+  {
     IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
     // Retrieve flows (bubble up any revert from DVP)
-    (, , IDeliveryVersusPaymentV1.Flow[] memory flows, , , , , ) = dvp.getSettlement(settlementId);
+    (,, IDeliveryVersusPaymentV1.Flow[] memory flows,,,,,) = dvp.getSettlement(settlementId);
     return this.computeNettedFlows(flows);
   }
 
@@ -162,9 +163,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    *
    * @return netted An array of flows representing a netted execution plan equivalent to the original.
    */
-  function computeNettedFlows(
-    IDeliveryVersusPaymentV1.Flow[] memory flows
-  ) external pure returns (IDeliveryVersusPaymentV1.Flow[] memory netted) {
+  function computeNettedFlows(IDeliveryVersusPaymentV1.Flow[] memory flows)
+    external
+    pure
+    returns (IDeliveryVersusPaymentV1.Flow[] memory netted)
+  {
     uint256 lengthFlows = flows.length;
     // Upper bound for netted flows is original length
     netted = new IDeliveryVersusPaymentV1.Flow[](lengthFlows);
@@ -237,15 +240,8 @@ contract DeliveryVersusPaymentV1HelperV1 {
         }
         // else fully canceled path -> no transfer needed
       } else {
-        outCount = _appendNettedFungible(
-          assets[k].token,
-          parties,
-          balances,
-          k * partyCount,
-          partyCount,
-          netted,
-          outCount
-        );
+        outCount =
+          _appendNettedFungible(assets[k].token, parties, balances, k * partyCount, partyCount, netted, outCount);
       }
     }
 
@@ -334,12 +330,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @return matchingIds An array of matching settlement IDs (of length <= pageSize).
    * @return nextCursor The settlement ID from which to continue in the next call (or 0 if there are no more).
    */
-  function _getPagedSettlementIdsByType(
-    address dvpAddress,
-    uint256 startCursor,
-    uint256 pageSize,
-    TokenType tokenType
-  ) internal view returns (uint256[] memory matchingIds, uint256 nextCursor) {
+  function _getPagedSettlementIdsByType(address dvpAddress, uint256 startCursor, uint256 pageSize, TokenType tokenType)
+    internal
+    view
+    returns (uint256[] memory matchingIds, uint256 nextCursor)
+  {
     IDeliveryVersusPaymentV1 dvp = IDeliveryVersusPaymentV1(dvpAddress);
     uint256 current = startCursor == 0 ? dvp.settlementIdCounter() : startCursor;
     uint256[] memory temp = new uint256[](pageSize);
@@ -378,10 +373,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @param tokenType The token type filter.
    * @return True if at least one flow matches the token type, false otherwise.
    */
-  function _matchesTokenType(
-    IDeliveryVersusPaymentV1.Flow[] memory flows,
-    TokenType tokenType
-  ) internal pure returns (bool) {
+  function _matchesTokenType(IDeliveryVersusPaymentV1.Flow[] memory flows, TokenType tokenType)
+    internal
+    pure
+    returns (bool)
+  {
     uint256 lengthFlows = flows.length;
     for (uint256 i = 0; i < lengthFlows; i++) {
       // For Ether, the token address must be zero.
@@ -408,7 +404,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
     return type(uint256).max;
   }
 
-  function _indexOfAssetMeta(AssetMeta[] memory arr, uint256 length, AssetMeta memory m) internal pure returns (uint256) {
+  function _indexOfAssetMeta(AssetMeta[] memory arr, uint256 length, AssetMeta memory m)
+    internal
+    pure
+    returns (uint256)
+  {
     for (uint256 i = 0; i < length; i++) {
       AssetMeta memory x = arr[i];
       if (x.token == m.token && x.isNFT == m.isNFT && x.id == m.id) {
@@ -434,7 +434,6 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256[] memory posAmt = new uint256[](partyCount);
     uint256 ni = 0;
     uint256 pj = 0;
-
 
     // Split into negative and positive balances
     // and record indices of parties so we can create the flows later
@@ -468,7 +467,6 @@ contract DeliveryVersusPaymentV1HelperV1 {
      * - This continues until all debtors or all creditors are settled.
      *
      */
-
     uint256 iNeg = 0;
     uint256 jPos = 0;
     while (iNeg < ni && jPos < pj) {
@@ -510,13 +508,11 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @param party Address of the party to compute requirements for.
    * @return result NetRequirement data struct with ETH and ERC20 requirements.
    */
-  function computeNetRequirementsForParty(
-    address dvpAddress,
-    uint256 settlementId,
-    address party
-  ) external view returns (
-    NetRequirement memory result
-  ) {
+  function computeNetRequirementsForParty(address dvpAddress, uint256 settlementId, address party)
+    external
+    view
+    returns (NetRequirement memory result)
+  {
     IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
     return _computeNetRequirementsForParty(netted, party);
   }
@@ -531,13 +527,12 @@ contract DeliveryVersusPaymentV1HelperV1 {
    * @param parties Array of addresses of the parties to compute requirements for.
    * @return results Array of NetRequirement data structs with ETH and ERC20 requirements for each party.
    */
-  function computeNetRequirementsForParties(
-    address dvpAddress,
-    uint256 settlementId,
-    address[] calldata parties
-  ) external view returns (
-    NetRequirement[] memory results
-  ) {
+
+  function computeNetRequirementsForParties(address dvpAddress, uint256 settlementId, address[] calldata parties)
+    external
+    view
+    returns (NetRequirement[] memory results)
+  {
     IDeliveryVersusPaymentV1.Flow[] memory netted = this.computeNettedFlows(dvpAddress, settlementId);
 
     results = new NetRequirement[](parties.length);
@@ -547,17 +542,19 @@ contract DeliveryVersusPaymentV1HelperV1 {
   }
 
   /**
-  * @notice Compute net requirements for a party from netted flows.
-  * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
-  * when executing via a debtor→creditor netted plan.
-  * NFTs are excluded because they require per-tokenId approvals rather than amounts.
-  * @param flows Array of netted flows to analyze.
-  * @param party Address of the party to compute requirements for.
-  * @return result NetRequirement data struct with ETH and ERC20 requirements.
-  */
-  function _computeNetRequirementsForParty(IDeliveryVersusPaymentV1.Flow[] memory flows, address party) internal pure returns (
-    NetRequirement memory result
-  ) {
+   * @notice Compute net requirements for a party from netted flows.
+   * @dev Returns the net ETH a party must deposit (if positive) and the minimal ERC20 approvals per token
+   * when executing via a debtor→creditor netted plan.
+   * NFTs are excluded because they require per-tokenId approvals rather than amounts.
+   * @param flows Array of netted flows to analyze.
+   * @param party Address of the party to compute requirements for.
+   * @return result NetRequirement data struct with ETH and ERC20 requirements.
+   */
+  function _computeNetRequirementsForParty(IDeliveryVersusPaymentV1.Flow[] memory flows, address party)
+    internal
+    pure
+    returns (NetRequirement memory result)
+  {
     for (uint256 i = 0; i < flows.length; i++) {
       IDeliveryVersusPaymentV1.Flow memory f = flows[i];
       if (f.from == party) {
@@ -589,5 +586,4 @@ contract DeliveryVersusPaymentV1HelperV1 {
       }
     }
   }
-
 }

@@ -94,7 +94,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     vm.prank(alice);
     dvp.approveSettlements(settlementIds);
 
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
   }
 
@@ -104,10 +104,8 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check Alice's ETH requirements before approval
-    (bool isApproved, uint256 etherRequired, uint256 etherDeposited, ) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (bool isApproved, uint256 etherRequired, uint256 etherDeposited,) =
+      dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertFalse(isApproved);
     assertEq(etherRequired, TOKEN_AMOUNT_SMALL_18_DECIMALS);
@@ -120,7 +118,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     dvp.approveSettlements{value: TOKEN_AMOUNT_SMALL_18_DECIMALS}(settlementIds);
 
     // Check status after approval
-    (isApproved, etherRequired, etherDeposited, ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (isApproved, etherRequired, etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertTrue(isApproved);
     assertEq(etherRequired, TOKEN_AMOUNT_SMALL_18_DECIMALS);
@@ -134,10 +132,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     uint256 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      dave
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, dave);
 
     assertEq(tokenStatuses.length, 1);
     assertEq(tokenStatuses[0].amountOrIdRequired, TOKEN_AMOUNT_LARGE_6_DECIMALS * 2);
@@ -153,10 +148,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check initial status
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertEq(tokenStatuses[0].amountOrIdHeldByParty, NFT_CAT_DAISY); // Alice owns it
 
@@ -165,7 +157,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY);
 
     // Check status after transfer
-    (, , , tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (,,, tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertEq(tokenStatuses[0].amountOrIdHeldByParty, 0); // Alice no longer owns it
   }
 
@@ -179,10 +171,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     // Use setApprovalForAll
     _approveAllNFTs(alice, nftCat);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertEq(tokenStatuses[0].amountOrIdApprovedForDvp, NFT_CAT_DAISY);
   }
@@ -197,10 +186,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     // Use specific approval
     _approveNFT(alice, nftCat, NFT_CAT_DAISY);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertEq(tokenStatuses[0].amountOrIdApprovedForDvp, NFT_CAT_DAISY);
   }
@@ -215,10 +201,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     // Approve different NFT
     _approveNFT(alice, nftCat, NFT_CAT_BUTTONS);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     assertEq(tokenStatuses[0].amountOrIdApprovedForDvp, 0); // Wrong NFT approved
   }
@@ -235,10 +218,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     // Approve enough for both flows
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS * 2);
 
-    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
-      settlementId,
-      alice
-    );
+    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
 
     // Should only have one entry for USDC with aggregated amount
     assertEq(tokenStatuses.length, 2); // Two flows = two entries in status (not aggregated in this implementation)
@@ -311,7 +291,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     dvp.approveSettlements(settlementIds); // This will auto-execute
 
     // Check status after execution - should still show approved
-    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
   }
 

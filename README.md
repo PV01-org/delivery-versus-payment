@@ -126,7 +126,7 @@ It is acknowledged that bad actors could be annoying by creating flows with fake
 ### Reentrancy Protection
 Settlement approval can be done in batches. Settlement execution can potentially be triggered inside that (if auto-settle is switched on and a party is giving the final approval). Settlement execution can make many external calls to process transfers of assets. These patterns lend themselves well to reentrancy, which is protected against as follows:
 
-| Function             | Reentrancy Protection     | 
+| Function             | Reentrancy Protection     |
 |----------------------|---------------------------|
 | approveSettlements() | OZ nonReentrant modifer   |
 | createSettlement()   | No external calls made    |
@@ -154,6 +154,25 @@ Topic0 values for events are:
 | SettlementAutoExecutionFailedReason(uint256,address,string) | 0xe1c01819733d746479549271d3a51445514b8f678614d50ad34d305c67b83d9c |
 | SettlementCreated(uint256,address)                          | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
 | SettlementExecuted(uint256,address)                         | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
+
+## Linting and pre-commit
+This repository uses pre-commit to run lightweight checks and enforce a standard Solidity code format via Foundry.
+
+Setup (one-time):
+- Install pre-commit (choose one):
+  - pipx: `pipx install pre-commit`
+  - pip: `pip install --user pre-commit`
+  - Homebrew (macOS): `brew install pre-commit`
+- Ensure Foundry is installed and available in your PATH: https://book.getfoundry.sh/getting-started/installation
+- Enable hooks in this repo: `pre-commit install`
+
+Usage:
+- Run on all files: `pre-commit run --all-files`
+- On commit, hooks will run automatically.
+- The Solidity formatter runs in check mode (`forge fmt --check`). If formatting fails, fix with: `forge fmt`
+
+Formatting standard:
+- Uses Foundry's standard formatter configured in `foundry.toml` under `[fmt]` (e.g., `line_length = 120`, `tab_width = 2`).
 
 ## Contributing
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.

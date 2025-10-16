@@ -2,14 +2,13 @@
 pragma solidity 0.8.30;
 
 /**
-██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
-██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
-██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
-██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
-██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
-╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
+ * ██████╗░██╗░░░██╗██████╗░███████╗░█████╗░░██████╗██╗░░░██╗░░░██╗░░██╗██╗░░░██╗███████╗
+ * ██╔══██╗██║░░░██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗░██╔╝░░░╚██╗██╔╝╚██╗░██╔╝╚════██║
+ * ██║░░██║╚██╗░██╔╝██████╔╝█████╗░░███████║╚█████╗░░╚████╔╝░░░░░╚███╔╝░░╚████╔╝░░░███╔═╝
+ * ██║░░██║░╚████╔╝░██╔═══╝░██╔══╝░░██╔══██║░╚═══██╗░░╚██╔╝░░░░░░██╔██╗░░░╚██╔╝░░██╔══╝░░
+ * ██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
+ * ╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
  */
-
 import {Address} from "@openzeppelin/contracts-v5-2-0/utils/Address.sol";
 import {ERC165Checker} from "@openzeppelin/contracts-v5-2-0/utils/introspection/ERC165Checker.sol";
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
@@ -75,7 +74,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   event SettlementCreated(uint256 indexed settlementId, address indexed creator);
   event SettlementExecuted(uint256 indexed settlementId, address indexed executor);
   event SettlementAutoExecutionFailedReason(uint256 indexed settlementId, address indexed executor, string reason);
-  event SettlementAutoExecutionFailedPanic(uint256 indexed settlementId, address indexed executor, uint errorCode);
+  event SettlementAutoExecutionFailedPanic(uint256 indexed settlementId, address indexed executor, uint256 errorCode);
   event SettlementAutoExecutionFailedOther(uint256 indexed settlementId, address indexed executor, bytes lowLevelData);
   event SettlementApprovalRevoked(uint256 indexed settlementId, address indexed party);
 
@@ -133,6 +132,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     bool isAutoSettled;
     bool useNettingOff;
   }
+
   mapping(uint256 => Settlement) private settlements;
 
   /// @dev Last settlement id used
@@ -190,10 +190,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       if (block.timestamp > settlement.cutoffDate) revert CutoffDatePassed();
       if (settlement.approvals[msg.sender]) revert ApprovalAlreadyGranted();
       // Calculate ETH required for this settlement by this party, and check that the party is involved
-      (uint256 ethAmountRequired, bool isInvolved) = _getEthRequiredAndIsInvolved(
-        settlement.useNettingOff ? settlement.nettedFlows : settlement.flows,
-        msg.sender
-      );
+      (uint256 ethAmountRequired, bool isInvolved) =
+        _getEthRequiredAndIsInvolved(settlement.useNettingOff ? settlement.nettedFlows : settlement.flows, msg.sender);
 
       if (!isInvolved) revert CallerNotInvolved();
 
@@ -224,7 +222,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         } catch Error(string memory reason) {
           // Revert with reason string
           emit SettlementAutoExecutionFailedReason(settlementId, msg.sender, reason);
-        } catch Panic(uint errorCode) {
+        } catch Panic(uint256 errorCode) {
           // Revert due to serious error (eg division by zero)
           emit SettlementAutoExecutionFailedPanic(settlementId, msg.sender, errorCode);
         } catch (bytes memory lowLevelData) {
@@ -235,7 +233,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     }
   }
 
-  function _getEthRequiredAndIsInvolved(Flow[] storage flows, address party) internal view returns (uint256 ethAmountRequired, bool isInvolved) {
+  function _getEthRequiredAndIsInvolved(Flow[] storage flows, address party)
+    internal
+    view
+    returns (uint256 ethAmountRequired, bool isInvolved)
+  {
     ethAmountRequired = 0;
     isInvolved = false;
     uint256 lengthFlows = flows.length;
@@ -249,7 +251,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       }
     }
   }
-
 
   /**
    * @dev Sets the netted flows for a given settlement. This function allows the creator of the settlement
@@ -410,9 +411,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @dev Retrieves settlement details.
    * @param settlementId The id of the settlement to retrieve.
    */
-  function getSettlement(
-    uint256 settlementId
-  )
+  function getSettlement(uint256 settlementId)
     external
     view
     returns (
@@ -455,10 +454,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementId The id of the settlement to check.
    * @param party The party to check.
    */
-  function getSettlementPartyStatus(
-    uint256 settlementId,
-    address party
-  )
+  function getSettlementPartyStatus(uint256 settlementId, address party)
     external
     view
     returns (bool isApproved, uint256 etherRequired, uint256 etherDeposited, TokenStatus[] memory tokenStatuses)
@@ -551,10 +547,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   // Validate whether original flows and netted flows are equivalent.
   // Reverts if not equivalent
   // Returns partyCount and array of unique parties (length = partyCount) for convenience.
-  function _validateNettedFlows(Flow[] memory originalFlows, Flow[] memory nettedFlows) internal pure returns (
-    uint256 partyCount,
-    address[] memory parties
-  ){
+  function _validateNettedFlows(Flow[] memory originalFlows, Flow[] memory nettedFlows)
+    internal
+    pure
+    returns (uint256 partyCount, address[] memory parties)
+  {
     // Gather unique parties and asset keys from original flows
     uint256 lengthOriginalFlows = originalFlows.length;
     uint256 maxParties = lengthOriginalFlows * 2;
@@ -638,7 +635,6 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         require(balances[k * partyCount + p] == 0, NotEquivalentNettedFlows());
       }
     }
-
   }
 
   // Executes flows stored in settlement.flows or settlement.nettedFlows
@@ -667,10 +663,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @return etherRequired The total ETH required from the party.
    * @return etherDeposited The total ETH deposited by the party.
    */
-  function _getPartyEthStats(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (uint256 etherRequired, uint256 etherDeposited) {
+  function _getPartyEthStats(Settlement storage settlement, address party)
+    internal
+    view
+    returns (uint256 etherRequired, uint256 etherDeposited)
+  {
     uint256 lengthFlows = settlement.flows.length;
     uint256 outgoingEth = 0;
     uint256 incomingEth = 0;
@@ -696,10 +693,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(
-    Settlement storage settlement,
-    address party
-  ) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -714,10 +708,8 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           tokenAddress: f.token,
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
-          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this) ||
-            nft.isApprovedForAll(party, address(this))
-            ? f.amountOrId
-            : 0,
+          amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
+            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {

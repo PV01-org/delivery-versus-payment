@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {DeliveryVersusPaymentV1} from "../../../src/dvp/V1/DeliveryVersusPaymentV1.sol";
 import {IDeliveryVersusPaymentV1} from "../../../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
-import "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 
 /**
  * @title DVPHandler
@@ -95,7 +95,7 @@ contract DVPHandler is Test {
     countCall("createSettlementEth")
   {
     uint256 flowCount = bound(flowCountSeed, 1, 5);
-    uint256 cutoffDate = block.timestamp + bound(cutoffSeed, 3600, 86400 * 7); // 1 hour to 7 days
+    uint128 cutoffDate = uint128(block.timestamp + bound(cutoffSeed, 3600, 86400 * 7)); // 1 hour to 7 days
 
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](flowCount);
 

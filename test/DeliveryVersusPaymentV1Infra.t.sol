@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "forge-std/Test.sol";
-import "./TestDvpBase.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
 
 /**
  * @title DeliveryVersusPaymentV1InfraTest

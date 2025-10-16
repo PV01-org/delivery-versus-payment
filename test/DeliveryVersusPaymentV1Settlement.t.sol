@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "./TestDvpBase.sol";
-import "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
+import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
 
 /**
  * @title DeliveryVersusPaymentV1SettlementTest
@@ -15,7 +16,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_approveSettlements_WithERC20Flows_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve ERC20 transfers
@@ -42,7 +43,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithETHFlows_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -76,7 +77,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithNFTFlows_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createNFTFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve NFT transfers
@@ -98,7 +99,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithMixedFlows_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve transfers
@@ -125,7 +126,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithExecutedSettlement_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true); // auto-settle
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
@@ -153,7 +154,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithIncorrectETHAmount_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -168,7 +169,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithAlreadyGrantedApproval_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
@@ -187,7 +188,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithNonInvolvedParty_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -199,7 +200,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithExpiredSettlement_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Move past cutoff
@@ -214,7 +215,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_approveSettlements_WithAutoSettlement_ExecutesAutomatically() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
     // Approve ERC20 transfers
@@ -246,7 +247,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Auto-executing settlements can fail to execute, but should retain the approval that triggered it
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(dave, alice, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_REASON_STRING);
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
     // Approve
@@ -266,7 +267,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     // Auto-executing settlements can fail to execute, but should retain the approval that triggered it
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(dave, alice, address(assetTokenThatReverts), AMOUNT_FOR_REVERT_PANIC);
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
     // Approve
@@ -287,7 +288,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_executeSettlement_WithValidERC20Settlement_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Get initial balances
@@ -325,7 +326,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_WithValidETHSettlement_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Get initial balances
@@ -354,7 +355,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_WithValidNFTSettlement_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createNFTFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check initial owners
@@ -382,7 +383,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_WithNotApproved_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementNotApproved.selector);
@@ -391,7 +392,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_WithExpiredSettlement_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     _advanceTime(2 days);
@@ -402,7 +403,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_executeSettlement_WithAlreadyExecuted_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
@@ -441,7 +442,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_revokeApprovals_WithValidApproval_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -481,7 +482,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_revokeApprovals_WithoutApproval_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -493,7 +494,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_revokeApprovals_WithExecutedSettlement_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true); // auto-settle
 
     _approveERC20(alice, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
@@ -518,7 +519,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_withdrawETH_AfterExpiry_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -537,7 +538,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
     emit DeliveryVersusPaymentV1.ETHWithdrawn(alice, aliceETHRequired);
 
     vm.prank(alice);
-    dvp.withdrawETH(settlementId);
+    dvp.withdrawETH(settlementIds);
 
     // Check ETH is returned
     (,, uint256 etherDeposited,) = dvp.getSettlementPartyStatus(settlementId, alice);
@@ -546,7 +547,7 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
   function test_withdrawETH_BeforeExpiry_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -556,18 +557,18 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     vm.expectRevert(DeliveryVersusPaymentV1.CutoffDateNotPassed.selector);
     vm.prank(alice);
-    dvp.withdrawETH(settlementId);
+    dvp.withdrawETH(settlementIds);
   }
 
   function test_withdrawETH_WithInvalidId_Reverts() public {
     // Non-existent settlement id means revert
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementDoesNotExist.selector);
-    dvp.withdrawETH(NOT_A_SETTLEMENT_ID);
+    dvp.withdrawETH(_getInvalidSettlementIdArray());
   }
 
   function test_withdrawETH_WithNoDeposit_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Move past cutoff
@@ -575,12 +576,13 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     vm.expectRevert(DeliveryVersusPaymentV1.NoETHToWithdraw.selector);
     vm.prank(alice);
-    dvp.withdrawETH(settlementId);
+    uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
+    dvp.withdrawETH(settlementIds);
   }
 
   function test_withdrawETH_WithExecutedSettlement_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
@@ -596,6 +598,6 @@ contract DeliveryVersusPaymentV1SettlementTest is TestDvpBase {
 
     vm.expectRevert(DeliveryVersusPaymentV1.SettlementAlreadyExecuted.selector);
     vm.prank(alice);
-    dvp.withdrawETH(settlementId);
+    dvp.withdrawETH(settlementIds);
   }
 }

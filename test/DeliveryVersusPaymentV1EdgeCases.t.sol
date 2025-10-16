@@ -4,8 +4,10 @@ pragma solidity 0.8.30;
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {IERC721Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts-v5-2-0/utils/ReentrancyGuard.sol";
-import "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
-import "./TestDvpBase.sol";
+import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
+import {MaliciousActorDVP} from "../src/mock/MaliciousActorDVP.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
 
 /**
  * @title DeliveryVersusPaymentV1EdgeCasesTest
@@ -20,7 +22,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Set up settlement with malicious actor receiving ETH for reentrancy attempt
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createETHFlow(alice, address(maliciousActor), 1 ether);
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
     vm.deal(alice, 2 ether);
 
@@ -36,15 +38,16 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit DeliveryVersusPaymentV1.SettlementAutoExecutionFailedOther({
+    emit DeliveryVersusPaymentV1.SettlementExecutionFailedOther({
       settlementId: settlementId,
       executor: alice,
+      autoExecuted: true,
       lowLevelData: abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector)
     });
     dvp.approveSettlements{value: 1 ether}(settlementIds);
 
     // Approval should have stuck
-    (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementId, alice);
     assertTrue(isApproved);
   }
 
@@ -52,7 +55,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Set up malicious actor for reentrancy attempt
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createETHFlow(alice, address(maliciousActor), 1 ether);
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
     vm.deal(alice, 2 ether);
 
@@ -74,7 +77,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createETHFlow(address(maliciousActor), alice, 1 ether);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     vm.deal(address(maliciousActor), 2 ether);
@@ -99,7 +102,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createETHFlow(address(maliciousActor), alice, 1 ether);
 
-    uint256 cutoff = _getFutureTimestamp(1);
+    uint128 cutoff = _getFutureTimestamp(1);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     vm.deal(address(maliciousActor), 2 ether);
@@ -120,7 +123,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Try to withdraw - should revert due to reentrancy guard
     vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
     vm.prank(address(maliciousActor));
-    dvp.withdrawETH(settlementId);
+    dvp.withdrawETH(settlementIds);
   }
 
   //--------------------------------------------------------------------------------
@@ -131,13 +134,13 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(dave, alice, usdc, TOKEN_AMOUNT_LARGE_6_DECIMALS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Want Dave to not have enough USDC - drain his balance
     uint256 daveUsdcBalance = usdcToken.balanceOf(dave);
     vm.prank(dave);
-    usdcToken.transfer(eve, daveUsdcBalance);
+    assertTrue(usdcToken.transfer(eve, daveUsdcBalance));
 
     // Approve
     _approveERC20(dave, usdc, TOKEN_AMOUNT_LARGE_6_DECIMALS);
@@ -156,7 +159,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve settlement but then revoke ERC20 allowance
@@ -174,7 +177,10 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Execution should fail due to insufficient allowance
     vm.expectRevert(
       abi.encodeWithSelector(
-        IERC20Errors.ERC20InsufficientAllowance.selector, address(dvp), 0, TOKEN_AMOUNT_SMALL_6_DECIMALS
+        IERC20Errors.ERC20InsufficientAllowance.selector,
+        address(dvp),
+        0,
+        TOKEN_AMOUNT_SMALL_6_DECIMALS
       )
     );
     dvp.executeSettlement(settlementId);
@@ -184,7 +190,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve NFT and settlement
@@ -197,7 +203,11 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     // Transfer NFT away after approval
     vm.prank(alice);
-    nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY);
+    try nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY) {
+      // ERC721 reverts on failure, success expected here
+    } catch {
+      revert("NFT transfer failed");
+    }
 
     // Execution should fail as Alice no longer owns the NFT
     vm.expectRevert(
@@ -210,7 +220,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve NFT first
@@ -239,13 +249,13 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(dave, alice, usdc, TOKEN_AMOUNT_LARGE_6_DECIMALS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true); // auto-settle
 
     // We want Dave to not have enough USDC
     uint256 daveUsdcBalance = usdcToken.balanceOf(dave);
     vm.prank(dave);
-    usdcToken.transfer(eve, daveUsdcBalance);
+    assertTrue(usdcToken.transfer(eve, daveUsdcBalance));
 
     // Approve the transfer anyway
     _approveERC20(dave, usdc, TOKEN_AMOUNT_LARGE_6_DECIMALS);
@@ -254,13 +264,13 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     // Auto-settlement should fail but not revert the approval
     vm.expectEmit(true, true, false, false);
-    emit DeliveryVersusPaymentV1.SettlementAutoExecutionFailedOther(settlementId, dave, "");
+    emit DeliveryVersusPaymentV1.SettlementExecutionFailedOther(settlementId, dave, true, "");
 
     vm.prank(dave);
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
+    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -270,7 +280,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, maliciousTokenAddress, 1000);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true); // auto-settle
 
     // Set up malicious token for reentrancy
@@ -284,13 +294,13 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     // Auto-settlement should fail due to reentrancy and emit failure event
     vm.expectEmit(true, true, false, false);
-    emit DeliveryVersusPaymentV1.SettlementAutoExecutionFailedOther(settlementId, alice, "");
+    emit DeliveryVersusPaymentV1.SettlementExecutionFailedOther(settlementId, alice, true, "");
 
     vm.prank(alice);
     dvp.approveSettlements(settlementIds);
 
     // Settlement should be approved but not executed
-    (,,, bool isSettled,) = dvp.getSettlement(settlementId);
+    (, , , bool isSettled, ) = dvp.getSettlement(settlementId);
     assertFalse(isSettled);
     assertTrue(dvp.isSettlementApproved(settlementId));
   }
@@ -306,7 +316,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     flows[2] = _createNFTFlow(alice, dave, nftCat, NFT_CAT_DAISY);
     flows[3] = _createERC20Flow(bob, alice, dai, TOKEN_AMOUNT_SMALL_18_DECIMALS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Partially approve tokens
@@ -351,13 +361,16 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Use setApprovalForAll instead of individual approval
     _approveAllNFTs(alice, nftCat);
 
-    (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
+    (, , , DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(
+      settlementId,
+      alice
+    );
 
     assertEq(tokenStatuses.length, 1);
     assertEq(tokenStatuses[0].amountOrIdApprovedForDvp, NFT_CAT_DAISY);
@@ -384,10 +397,10 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
       }
     }
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, "Large Settlement", cutoff, false);
 
-    (,, IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows,,) = dvp.getSettlement(settlementId);
+    (, , IDeliveryVersusPaymentV1.Flow[] memory retrievedFlows, , ) = dvp.getSettlement(settlementId);
     assertEq(retrievedFlows.length, numFlows);
   }
 
@@ -400,7 +413,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
       IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
       flows[0] = _createERC20Flow(alice, bob, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
 
-      uint256 cutoff = _getFutureTimestamp(7 days);
+      uint128 cutoff = _getFutureTimestamp(7 days);
       settlementIds[i] = dvp.createSettlement(flows, string(abi.encodePacked("Settlement ", i)), cutoff, false);
     }
 
@@ -413,7 +426,7 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
 
     // Verify all are approved
     for (uint256 i = 0; i < numSettlements; i++) {
-      (bool isApproved,,,) = dvp.getSettlementPartyStatus(settlementIds[i], alice);
+      (bool isApproved, , , ) = dvp.getSettlementPartyStatus(settlementIds[i], alice);
       assertTrue(isApproved);
     }
   }
@@ -425,19 +438,17 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(alice, bob, usdc, 0);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
-    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
-
-    assertEq(dvp.settlementIdCounter(), settlementId);
+    uint128 cutoff = _getFutureTimestamp(7 days);
+    vm.expectRevert(DeliveryVersusPaymentV1.InvalidAmountOrId.selector);
+    dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
   }
 
   function test_createSettlement_WithZeroAmountETH_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createETHFlow(alice, bob, 0);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
-    uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
-
-    assertEq(dvp.settlementIdCounter(), settlementId);
+    uint128 cutoff = _getFutureTimestamp(7 days);
+    vm.expectRevert(DeliveryVersusPaymentV1.InvalidAmountOrId.selector);
+    dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
   }
 }

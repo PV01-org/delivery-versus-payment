@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "./TestDvpBase.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
+import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
+import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {DeliveryVersusPaymentV1HelperV1} from "../src/dvp/V1/DeliveryVersusPaymentV1HelperV1.sol";
 
 /**
  * @title DeliveryVersusPaymentV1HelperV1Test
@@ -24,7 +27,7 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
   }
 
   function _createTestSettlements() internal {
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     // Create 10 settlements for each type: mixed, NFT-only, ERC20-only, Ether-only
     for (uint256 i = 0; i < 10; i++) {

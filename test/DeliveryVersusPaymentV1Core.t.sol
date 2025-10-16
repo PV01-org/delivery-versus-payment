@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "./TestDvpBase.sol";
-import "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
+import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
+import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
 
 /**
  * @title DeliveryVersusPaymentV1CoreTest
@@ -15,7 +16,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_createSettlement_WithValidFlowsAndFutureCutoff_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     vm.expectEmit(true, true, false, true);
     emit DeliveryVersusPaymentV1.SettlementCreated(1, address(this));
@@ -43,7 +44,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
   function test_createSettlement_WithAutoSettlement_Succeeds() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
@@ -54,7 +55,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
   function test_createSettlement_WithEmptyFlows_Reverts() public {
     IDeliveryVersusPaymentV1.Flow[] memory emptyFlows = new IDeliveryVersusPaymentV1.Flow[](0);
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     vm.expectRevert(DeliveryVersusPaymentV1.NoFlowsProvided.selector);
     dvp.createSettlement(emptyFlows, SETTLEMENT_REF, cutoff, false);
@@ -65,7 +66,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
     // Move time forward first, then use current time - 1 to ensure past cutoff
     vm.warp(block.timestamp + 1 hours);
-    uint256 pastCutoff = block.timestamp - 1;
+    uint128 pastCutoff = uint128(block.timestamp - 1);
 
     vm.expectRevert(DeliveryVersusPaymentV1.CutoffDatePassed.selector);
     dvp.createSettlement(flows, SETTLEMENT_REF, pastCutoff, false);
@@ -81,7 +82,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
       amountOrId: 1
     });
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     vm.expectRevert(DeliveryVersusPaymentV1.InvalidERC721Token.selector);
     dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
@@ -97,7 +98,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
       amountOrId: 1000
     });
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     vm.expectRevert(DeliveryVersusPaymentV1.InvalidERC20Token.selector);
     dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
@@ -108,7 +109,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getSettlement_WithValidId_ReturnsCorrectDetails() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
 
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true);
 
@@ -144,7 +145,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_isSettlementApproved_WithNoApprovals_ReturnsFalse() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     assertFalse(dvp.isSettlementApproved(settlementId));
@@ -152,7 +153,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
   function test_isSettlementApproved_WithPartialApprovals_ReturnsFalse() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve ERC20 transfers
@@ -169,7 +170,7 @@ contract DeliveryVersusPaymentV1CoreTest is TestDvpBase {
 
   function test_isSettlementApproved_WithAllApprovals_ReturnsTrue() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve ERC20 transfers

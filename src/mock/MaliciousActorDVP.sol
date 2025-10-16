@@ -43,7 +43,9 @@ contract MaliciousActorDVP {
       //------------------------------------------------------------------------------
       // Re-enter withdrawETH()
       //------------------------------------------------------------------------------
-      dvp.withdrawETH(targetSettlementId);
+      uint256[] memory ids = new uint256[](1);
+      ids[0] = targetSettlementId;
+      dvp.withdrawETH(ids);
       //
     } else if (reentrancyMode == ReentrancyMode.ApproveSettlement) {
       //------------------------------------------------------------------------------

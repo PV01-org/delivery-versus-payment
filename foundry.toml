@@ -6,6 +6,8 @@ no_match_coverage = "src/mock/|test/|script/"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
+# For doing bytecode comparisons without the metadata hash at the end, uncomment this line:
+# bytecode_hash = "none"
 
 [rpc_endpoints]
 arbsepolia = "${RPC_ARBSEPOLIA}"
@@ -33,5 +35,12 @@ tab_width = 2
 runs = 5            # default 256
 depth = 1000        # default 500
 show_metrics = true
+
+[lint]
+exclude_lints = [
+  "mixed-case-function",
+  "mixed-case-variable",
+  "screaming-snake-case-immutable",
+]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

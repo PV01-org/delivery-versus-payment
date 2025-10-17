@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
-import "@openzeppelin/contracts-v5-2-0/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts-v5-2-0/token/ERC20/ERC20.sol";
 
 /**
  * @dev ERC20 that attempts to re-enter DVP `executeSettlement` during a `transferFrom` call.

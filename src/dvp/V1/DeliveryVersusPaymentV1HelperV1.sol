@@ -9,7 +9,7 @@ pragma solidity 0.8.30;
  * ██████╔╝░░╚██╔╝░░██║░░░░░███████╗██║░░██║██████╔╝░░░██║░░░██╗██╔╝╚██╗░░░██║░░░███████╗
  * ╚═════╝░░░░╚═╝░░░╚═╝░░░░░╚══════╝╚═╝░░╚═╝╚═════╝░░░░╚═╝░░░╚═╝╚═╝░░╚═╝░░░╚═╝░░░╚══════╝
  */
-import "./IDeliveryVersusPaymentV1.sol";
+import {IDeliveryVersusPaymentV1} from "./IDeliveryVersusPaymentV1.sol";
 
 /**
  * @title DeliveryVersusPaymentV1HelperV1
@@ -34,7 +34,6 @@ contract DeliveryVersusPaymentV1HelperV1 {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
-
   }
 
   // A struct for returning token type information.
@@ -141,9 +140,9 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
-        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
-      ) {
+      try dvp.getSettlement(
+        current
+      ) returns (string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool) {
         bool found = false;
         uint256 lengthFlows = flows.length;
         for (uint256 i = 0; i < lengthFlows; i++) {
@@ -195,9 +194,9 @@ contract DeliveryVersusPaymentV1HelperV1 {
     uint256 count = 0;
 
     while (current > 0 && count < pageSize) {
-      try dvp.getSettlement(current) returns (
-        string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
-      ) {
+      try dvp.getSettlement(
+        current
+      ) returns (string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool) {
         if (_matchesTokenType(flows, tokenType)) {
           temp[count] = current;
           count++;

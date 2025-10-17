@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {DeliveryVersusPaymentV1} from "../../src/dvp/V1/DeliveryVersusPaymentV1.sol";
 import {IDeliveryVersusPaymentV1} from "../../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
@@ -85,7 +84,9 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
     view
     returns (bool exists, bool isSettled, uint256 flowCount, uint256 cutoffDate)
   {
-    try dvp.getSettlement(settlementId) returns (
+    try dvp.getSettlement(
+      settlementId
+    ) returns (
       string memory, uint256 _cutoffDate, IDeliveryVersusPaymentV1.Flow[] memory flows, bool _isSettled, bool
     ) {
       exists = true;

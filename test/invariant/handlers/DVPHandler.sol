@@ -3,7 +3,7 @@ pragma solidity 0.8.30;
 
 import {DeliveryVersusPaymentV1} from "../../../src/dvp/V1/DeliveryVersusPaymentV1.sol";
 import {IDeliveryVersusPaymentV1} from "../../../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
-import "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 
 /**
  * @title DVPHandler
@@ -95,7 +95,7 @@ contract DVPHandler is Test {
     countCall("createSettlementEth")
   {
     uint256 flowCount = bound(flowCountSeed, 1, 5);
-    uint256 cutoffDate = block.timestamp + bound(cutoffSeed, 3600, 86400 * 7); // 1 hour to 7 days
+    uint128 cutoffDate = uint128(block.timestamp + bound(cutoffSeed, 3600, 86400 * 7)); // 1 hour to 7 days
 
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](flowCount);
 
@@ -179,11 +179,7 @@ contract DVPHandler is Test {
     address to = actors[toIndex];
 
     return IDeliveryVersusPaymentV1.Flow({
-      token: address(0),
-      isNFT: false,
-      from: from,
-      to: to,
-      amountOrId: bound(seed, 0.1 ether, 10 ether)
+      token: address(0), isNFT: false, from: from, to: to, amountOrId: bound(seed, 0.1 ether, 10 ether)
     });
   }
 
@@ -197,9 +193,9 @@ contract DVPHandler is Test {
 
   /// @dev Calculates ETH required for msg.sender to approve a settlement
   function calculateEthRequiredForMsgSender(uint256 settlementId) external view returns (uint256) {
-    try dvp.getSettlement(settlementId) returns (
-      string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
-    ) {
+    try dvp.getSettlement(
+      settlementId
+    ) returns (string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool) {
       uint256 ethRequired = 0;
       // Sum all ETH amounts this party is sending
       for (uint256 i = 0; i < flows.length; i++) {

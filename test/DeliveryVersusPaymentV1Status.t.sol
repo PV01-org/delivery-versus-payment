@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "./TestDvpBase.sol";
+import {TestDvpBase} from "./TestDvpBase.sol";
+import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
+import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
 
 /**
  * @title DeliveryVersusPaymentV1StatusTest
@@ -14,7 +16,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
   //--------------------------------------------------------------------------------
   function test_getSettlementPartyStatus_BeforeApproval_ReturnsCorrectStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check Alice's status (sender in multiple flows)
@@ -54,7 +56,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_AfterPartialApproval_ReturnsCorrectStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createMixedFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Partially approve - only USDC, not NFT
@@ -83,7 +85,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_AfterSettlementApproval_ReturnsCorrectStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve ERC20 and then settlement
@@ -100,7 +102,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_WithETHFlows_ReturnsCorrectETHStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createETHFlows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check Alice's ETH requirements before approval
@@ -129,7 +131,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createERC20Flow(dave, alice, usdc, TOKEN_AMOUNT_LARGE_6_DECIMALS * 2); // More than Dave has
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     (,,, DeliveryVersusPaymentV1.TokenStatus[] memory tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, dave);
@@ -144,7 +146,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check initial status
@@ -154,7 +156,12 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
     // Transfer NFT away
     vm.prank(alice);
-    nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY);
+    try nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY) {
+    // ERC721 reverts on failure, success expected here
+    }
+    catch {
+      revert("NFT transfer failed");
+    }
 
     // Check status after transfer
     (,,, tokenStatuses) = dvp.getSettlementPartyStatus(settlementId, alice);
@@ -165,7 +172,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Use setApprovalForAll
@@ -180,7 +187,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Use specific approval
@@ -195,7 +202,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     IDeliveryVersusPaymentV1.Flow[] memory flows = new IDeliveryVersusPaymentV1.Flow[](1);
     flows[0] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve different NFT
@@ -212,7 +219,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     flows[0] = _createERC20Flow(alice, bob, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
     flows[1] = _createERC20Flow(alice, charlie, usdc, TOKEN_AMOUNT_SMALL_6_DECIMALS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Approve enough for both flows
@@ -231,7 +238,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_AsReceiver_ReturnsEmptyTokenStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check Bob's status (he's a receiver in first flow, sender in second)
@@ -251,7 +258,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_WithNonInvolvedParty_ReturnsEmptyStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     // Check Dave's status (not involved)
@@ -275,7 +282,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
 
   function test_getSettlementPartyStatus_AfterSettlementExecution_ReturnsCorrectStatus() public {
     IDeliveryVersusPaymentV1.Flow[] memory flows = _createERC20Flows();
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, true); // auto-settle
 
     // Approve and execute
@@ -304,7 +311,7 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     flows[3] = _createNFTFlow(alice, bob, nftCat, NFT_CAT_DAISY);
     flows[4] = _createNFTFlow(alice, charlie, nftCat, NFT_CAT_BUTTONS);
 
-    uint256 cutoff = _getFutureTimestamp(7 days);
+    uint128 cutoff = _getFutureTimestamp(7 days);
     uint256 settlementId = dvp.createSettlement(flows, SETTLEMENT_REF, cutoff, false);
 
     (

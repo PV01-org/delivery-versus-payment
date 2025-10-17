@@ -51,13 +51,13 @@ forge build
 
 ## Commands
 The following CLI commands are available:
-| # | Action         | Usage                       | Description                               |
-|---|----------------|-----------------------------|-------------------------------------------|
-| 1 | Compile        | `forge build`               | Compile Solidity smart contracts.         |
-| 2 | Test           | `forge test --summary`      | Run smart contract tests.                 |
-| 3 | Coverage       | `forge coverage`            | Run tests and generate coverage reports.  |
-| 4 | Gas Estimate   | `forge test --gas-report`   | Run tests with gas reporting.             |
-| 5 | Sizer          | `forge build --sizes`       | Report contract size.                     |
+| # | Action         | Usage                         | Description                               |
+|---|----------------|-------------------------------|-------------------------------------------|
+| 1 | Compile        | `forge build`                 | Compile Solidity smart contracts.         |
+| 2 | Test           | `forge test --summary`        | Run smart contract tests.                 |
+| 3 | Coverage       | `forge coverage --ir-minimum` | Run tests and generate coverage reports.  |
+| 4 | Gas Estimate   | `forge test --gas-report`     | Run tests with gas reporting.             |
+| 5 | Sizer          | `forge build --sizes`         | Report contract size.                     |
 
 ## Deployed Addresses
 The DVP contracts are available at the following addresses. Since the solution is permissionless, they can be freely used as they are, without needing further contract deployments. To deploy new contracts see [Further Deployments](#further-deployments).

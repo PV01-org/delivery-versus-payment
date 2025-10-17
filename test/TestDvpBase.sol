@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.30;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {DeliveryVersusPaymentV1} from "../src/dvp/V1/DeliveryVersusPaymentV1.sol";
 import {DeliveryVersusPaymentV1HelperV1} from "../src/dvp/V1/DeliveryVersusPaymentV1HelperV1.sol";
 import {IDeliveryVersusPaymentV1} from "../src/dvp/V1/IDeliveryVersusPaymentV1.sol";
@@ -243,8 +243,8 @@ contract TestDvpBase is Test {
     arr[0] = settlementId;
   }
 
-  function _getFutureTimestamp(uint256 secondsInFuture) internal view returns (uint256) {
-    return block.timestamp + secondsInFuture;
+  function _getFutureTimestamp(uint256 secondsInFuture) internal view returns (uint128) {
+    return uint128(block.timestamp + secondsInFuture);
   }
 
   function _advanceTime(uint256 secondsToMove) internal {

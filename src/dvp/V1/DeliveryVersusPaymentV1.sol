@@ -73,9 +73,15 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   event SettlementApproved(uint256 indexed settlementId, address indexed party);
   event SettlementCreated(uint256 indexed settlementId, address indexed creator);
   event SettlementExecuted(uint256 indexed settlementId, address indexed executor);
-  event SettlementAutoExecutionFailedReason(uint256 indexed settlementId, address indexed executor, string reason);
-  event SettlementAutoExecutionFailedPanic(uint256 indexed settlementId, address indexed executor, uint256 errorCode);
-  event SettlementAutoExecutionFailedOther(uint256 indexed settlementId, address indexed executor, bytes lowLevelData);
+  event SettlementExecutionFailedReason(
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, string reason
+  );
+  event SettlementExecutionFailedPanic(
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, uint256 errorCode
+  );
+  event SettlementExecutionFailedOther(
+    uint256 indexed settlementId, address indexed executor, bool autoExecuted, bytes lowLevelData
+  );
   event SettlementApprovalRevoked(uint256 indexed settlementId, address indexed party);
 
   // Custom Errors
@@ -87,8 +93,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   error CutoffDateNotPassed();
   error CutoffDatePassed();
   error IncorrectETHAmount();
+  error InvalidAmountOrId();
   error InvalidERC20Token();
   error InvalidERC721Token();
+  error InvalidFromAddress();
+  error InvalidToAddress();
   error NoETHToWithdraw();
   error NoFlowsProvided();
   error SettlementAlreadyExecuted();
@@ -116,10 +125,10 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    */
   struct Settlement {
     string settlementReference;
-    uint256 cutoffDate;
     Flow[] flows;
     mapping(address => bool) approvals;
     mapping(address => uint256) ethDeposits;
+    uint128 cutoffDate;
     bool isSettled;
     bool isAutoSettled;
   }
@@ -141,9 +150,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    */
   function isSettlementApproved(uint256 settlementId) public view returns (bool) {
     Settlement storage settlement = settlements[settlementId];
-    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-
     uint256 lengthFlows = settlement.flows.length;
+    if (lengthFlows == 0) revert SettlementDoesNotExist();
+
     for (uint256 i = 0; i < lengthFlows; i++) {
       address party = settlement.flows[i].from;
       if (!settlement.approvals[party]) {
@@ -199,7 +208,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       totalEthRequired += ethAmountRequired;
       settlement.approvals[msg.sender] = true;
       if (ethAmountRequired > 0) {
-        settlement.ethDeposits[msg.sender] += ethAmountRequired;
+        settlement.ethDeposits[msg.sender] = ethAmountRequired;
       }
 
       emit SettlementApproved(settlementId, msg.sender);
@@ -219,16 +228,17 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         // Other settlements will still be processed, and the earlier approval will remain. Note that try{} only
         // supports external/public calls.
         try this.executeSettlementInner(msg.sender, settlementId) {
-          // Success
-        } catch Error(string memory reason) {
+        // Success
+        }
+        catch Error(string memory reason) {
           // Revert with reason string
-          emit SettlementAutoExecutionFailedReason(settlementId, msg.sender, reason);
+          emit SettlementExecutionFailedReason(settlementId, msg.sender, true, reason);
         } catch Panic(uint256 errorCode) {
           // Revert due to serious error (eg division by zero)
-          emit SettlementAutoExecutionFailedPanic(settlementId, msg.sender, errorCode);
+          emit SettlementExecutionFailedPanic(settlementId, msg.sender, true, errorCode);
         } catch (bytes memory lowLevelData) {
           // Revert in every other case (eg custom error)
-          emit SettlementAutoExecutionFailedOther(settlementId, msg.sender, lowLevelData);
+          emit SettlementExecutionFailedOther(settlementId, msg.sender, true, lowLevelData);
         }
       }
     }
@@ -247,7 +257,7 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
   function createSettlement(
     Flow[] calldata flows,
     string calldata settlementReference,
-    uint256 cutoffDate,
+    uint128 cutoffDate,
     bool isAutoSettled
   ) external returns (uint256 id) {
     if (block.timestamp > cutoffDate) revert CutoffDatePassed();
@@ -257,11 +267,21 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
     // Validate flows
     for (uint256 i = 0; i < lengthFlows; i++) {
       Flow calldata flow = flows[i];
+      // Validate addresses
+      if (flow.from == address(0)) revert InvalidFromAddress();
+      if (flow.to == address(0)) revert InvalidToAddress();
+
+      // Validate tokens
       if (flow.isNFT) {
         if (!_isERC721(flow.token)) revert InvalidERC721Token();
       } else if (flow.token != address(0)) {
         if (!_isERC20(flow.token)) revert InvalidERC20Token();
       }
+
+      // Validate amounts
+      // For ERC20/ETH, zero amounts not expected
+      // For NFTs, tokenID 0 is valid per ERC721 standard
+      if (!flow.isNFT && flow.amountOrId == 0) revert InvalidAmountOrId();
     }
 
     // Store new settlement
@@ -280,7 +300,25 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementId The id of the settlement to execute.
    */
   function executeSettlement(uint256 settlementId) external nonReentrant {
-    this.executeSettlementInner(msg.sender, settlementId);
+    try this.executeSettlementInner(msg.sender, settlementId) {
+    // Success — settlement executed
+    }
+    catch Error(string memory reason) {
+      emit SettlementExecutionFailedReason(settlementId, msg.sender, false, reason);
+      revert(reason); // Still revert for manual execution
+    } catch Panic(uint256 errorCode) {
+      emit SettlementExecutionFailedPanic(settlementId, msg.sender, false, errorCode);
+      // Re-throw panic
+      assembly {
+        invalid()
+      }
+    } catch (bytes memory lowLevelData) {
+      emit SettlementExecutionFailedOther(settlementId, msg.sender, false, lowLevelData);
+      // Re-throw the original error
+      assembly {
+        revert(add(lowLevelData, 0x20), mload(lowLevelData))
+      }
+    }
   }
 
   /**
@@ -401,10 +439,13 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param settlementIds The ids of the settlements to revoke approvals for.
    */
   function revokeApprovals(uint256[] calldata settlementIds) external nonReentrant {
+    uint256 totalRefund = 0;
     uint256 lengthSettlements = settlementIds.length;
+
     for (uint256 i = 0; i < lengthSettlements; i++) {
       uint256 settlementId = settlementIds[i];
       Settlement storage settlement = settlements[settlementId];
+
       if (settlement.flows.length == 0) revert SettlementDoesNotExist();
       if (settlement.isSettled) revert SettlementAlreadyExecuted();
       if (!settlement.approvals[msg.sender]) revert ApprovalNotGranted();
@@ -412,33 +453,47 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
       uint256 ethAmountToRefund = settlement.ethDeposits[msg.sender];
       if (ethAmountToRefund > 0) {
         settlement.ethDeposits[msg.sender] = 0;
-        // sendValue reverts if unsuccessful
-        Address.sendValue(payable(msg.sender), ethAmountToRefund);
+        totalRefund += ethAmountToRefund;
         emit ETHWithdrawn(msg.sender, ethAmountToRefund);
       }
 
       settlement.approvals[msg.sender] = false;
       emit SettlementApprovalRevoked(settlementId, msg.sender);
     }
+
+    // sendValue reverts if unsuccessful
+    if (totalRefund > 0) {
+      Address.sendValue(payable(msg.sender), totalRefund);
+    }
   }
 
   /**
    * @dev Withdraws ETH deposits after the cutoff date if the settlement wasn't executed.
-   * @param settlementId The id of the settlement to withdraw ETH from.
+   * @param settlementIds The ids of the settlements to withdraw ETH from.
    */
-  function withdrawETH(uint256 settlementId) external nonReentrant {
-    Settlement storage settlement = settlements[settlementId];
-    if (settlement.flows.length == 0) revert SettlementDoesNotExist();
-    if (block.timestamp <= settlement.cutoffDate) revert CutoffDateNotPassed();
-    if (settlement.isSettled) revert SettlementAlreadyExecuted();
-    if (settlement.ethDeposits[msg.sender] == 0) revert NoETHToWithdraw();
+  function withdrawETH(uint256[] calldata settlementIds) external nonReentrant {
+    uint256 totalAmount = 0;
 
-    uint256 amount = settlement.ethDeposits[msg.sender];
-    settlement.ethDeposits[msg.sender] = 0;
+    for (uint256 i = 0; i < settlementIds.length; i++) {
+      uint256 settlementId = settlementIds[i];
+      Settlement storage settlement = settlements[settlementId];
 
+      if (settlement.flows.length == 0) revert SettlementDoesNotExist();
+      if (block.timestamp <= settlement.cutoffDate) revert CutoffDateNotPassed();
+      if (settlement.isSettled) revert SettlementAlreadyExecuted();
+
+      uint256 amount = settlement.ethDeposits[msg.sender];
+      if (amount > 0) {
+        settlement.ethDeposits[msg.sender] = 0;
+        totalAmount += amount;
+        emit ETHWithdrawn(msg.sender, amount);
+      }
+    }
+
+    if (totalAmount == 0) revert NoETHToWithdraw();
     // sendValue reverts if unsuccessful
-    Address.sendValue(payable(msg.sender), amount);
-    emit ETHWithdrawn(msg.sender, amount);
+    Address.sendValue(payable(msg.sender), totalAmount);
+    emit ETHWithdrawn(msg.sender, totalAmount);
   }
 
   /**
@@ -481,7 +536,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party)
+    internal
+    view
+    returns (TokenStatus[] memory)
+  {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -497,7 +556,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
           amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
-            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
+              || nft.isApprovedForAll(party, address(this))
+            ? f.amountOrId
+            : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {

@@ -38,7 +38,8 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     uint256[] memory settlementIds = _getSettlementIdArray(settlementId);
     vm.prank(alice);
     vm.expectEmit(true, true, true, true);
-    emit DeliveryVersusPaymentV1.SettlementExecutionFailedOther({
+    emit DeliveryVersusPaymentV1
+      .SettlementExecutionFailedOther({
       settlementId: settlementId,
       executor: alice,
       autoExecuted: true,
@@ -201,8 +202,9 @@ contract DeliveryVersusPaymentV1EdgeCasesTest is TestDvpBase {
     // Transfer NFT away after approval
     vm.prank(alice);
     try nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY) {
-      // ERC721 reverts on failure, success expected here
-    } catch {
+    // ERC721 reverts on failure, success expected here
+    }
+    catch {
       revert("NFT transfer failed");
     }
 

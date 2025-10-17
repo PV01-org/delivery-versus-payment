@@ -228,8 +228,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
         // Other settlements will still be processed, and the earlier approval will remain. Note that try{} only
         // supports external/public calls.
         try this.executeSettlementInner(msg.sender, settlementId) {
-          // Success
-        } catch Error(string memory reason) {
+        // Success
+        }
+        catch Error(string memory reason) {
           // Revert with reason string
           emit SettlementExecutionFailedReason(settlementId, msg.sender, true, reason);
         } catch Panic(uint256 errorCode) {
@@ -300,8 +301,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    */
   function executeSettlement(uint256 settlementId) external nonReentrant {
     try this.executeSettlementInner(msg.sender, settlementId) {
-      // Success — settlement executed
-    } catch Error(string memory reason) {
+    // Success — settlement executed
+    }
+    catch Error(string memory reason) {
       emit SettlementExecutionFailedReason(settlementId, msg.sender, false, reason);
       revert(reason); // Still revert for manual execution
     } catch Panic(uint256 errorCode) {
@@ -534,7 +536,11 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
    * @param party The party to check.
    * @return tokenStatuses An array of TokenStatus, one for each token in the settlement.
    */
-  function _getTokenStatuses(Settlement storage settlement, address party) internal view returns (TokenStatus[] memory) {
+  function _getTokenStatuses(Settlement storage settlement, address party)
+    internal
+    view
+    returns (TokenStatus[] memory)
+  {
     uint256 lengthFlows = settlement.flows.length;
     TokenStatus[] memory tokenStatuses = new TokenStatus[](lengthFlows);
     uint256 index = 0;
@@ -550,7 +556,9 @@ contract DeliveryVersusPaymentV1 is IDeliveryVersusPaymentV1, ReentrancyGuardTra
           isNFT: true,
           amountOrIdRequired: f.amountOrId,
           amountOrIdApprovedForDvp: nft.getApproved(f.amountOrId) == address(this)
-            || nft.isApprovedForAll(party, address(this)) ? f.amountOrId : 0,
+              || nft.isApprovedForAll(party, address(this))
+            ? f.amountOrId
+            : 0,
           amountOrIdHeldByParty: nft.ownerOf(f.amountOrId) == party ? f.amountOrId : 0
         });
       } else {

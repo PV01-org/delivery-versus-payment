@@ -18,7 +18,6 @@ contract DeliveryVersusPaymentV1HelperV1Test is TestDvpBase {
     Ether, // Settlements containing any flow with Ether (token == address(0))
     ERC20, // Settlements containing any flow with an ERC20 token (token != address(0) && isNFT == false)
     NFT // Settlements containing any flow with an NFT (token != address(0) && isNFT == true)
-
   }
 
   function setUp() public override {

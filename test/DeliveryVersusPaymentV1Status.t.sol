@@ -157,8 +157,9 @@ contract DeliveryVersusPaymentV1StatusTest is TestDvpBase {
     // Transfer NFT away
     vm.prank(alice);
     try nftCatToken.transferFrom(alice, eve, NFT_CAT_DAISY) {
-      // ERC721 reverts on failure, success expected here
-    } catch {
+    // ERC721 reverts on failure, success expected here
+    }
+    catch {
       revert("NFT transfer failed");
     }
 

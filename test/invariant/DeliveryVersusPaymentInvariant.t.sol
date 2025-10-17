@@ -84,7 +84,9 @@ contract DeliveryVersusPaymentInvariant is StdInvariant, Test {
     view
     returns (bool exists, bool isSettled, uint256 flowCount, uint256 cutoffDate)
   {
-    try dvp.getSettlement(settlementId) returns (
+    try dvp.getSettlement(
+      settlementId
+    ) returns (
       string memory, uint256 _cutoffDate, IDeliveryVersusPaymentV1.Flow[] memory flows, bool _isSettled, bool
     ) {
       exists = true;

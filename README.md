@@ -78,10 +78,14 @@ The DVP contracts are available at the following addresses. Since the solution i
 
 ## Further Deployments
 ### Deploying Individual Contracts
-To deploy further copies of individual contracts, use the deploy scripts in the `./script` folder, for example:
+To deploy further copies of individual contracts, with code verification, use the deploy scripts in the `./script` folder. For example, without requiring any `.env` file:
 
 ```bash
-forge script script/DeployDvp.s.sol --rpc-url <$RPC_URL> --private-key <$PRIVATE_KEY> --broadcast
+forge script script/DeployDvp.s.sol \
+  --rpc-url <RPC_URL> \
+  --private-key <PRIVATE_KEY> \
+  --verify --etherscan-api-key <ETHERSCAN_API_KEY> \
+  --broadcast
 ```
 
 ### Deploying Contracts to Many Chains

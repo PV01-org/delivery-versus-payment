@@ -76,21 +76,41 @@ The DVP contracts are available at the following addresses. Since the solution i
 | Polygon     | Mainnet           | [DeliveryVersusPaymentV1](https://polygonscan.com/address/0xFBdA0E404B429c878063b3252A2c2da14fe28e7f)          | `0xFBdA0E404B429c878063b3252A2c2da14fe28e7f` |
 | Polygon     | Mainnet           | [DeliveryVersusPaymentV1HelperV1](https://polygonscan.com/address/0x662E81BCfF1887C4F73f8086E9D0d590F85A7f1E)  | `0x662E81BCfF1887C4F73f8086E9D0d590F85A7f1E` |
 
-### Further Deployments
+## Further Deployments
+### Deploying Individual Contracts
 To deploy further copies of individual contracts, use the deploy scripts in the `./script` folder, for example:
 
 ```bash
 forge script script/DeployDvp.s.sol --rpc-url <$RPC_URL> --private-key <$PRIVATE_KEY> --broadcast
 ```
 
-To deploy contracts on many chains follow these steps:
-1. Define the network names to deploy to in `foundry.toml`.
-2. Copy `.env.template` to `.env` and maintain environment variables. Network names should match those defined in `foundry.toml`.
-3. Edit the deploy script `deploy-multi-chain.sh` in the `.scripts` folder. Change the variable called `NETWORKS` to contain the network names you want to deploy to.
+### Deploying Contracts to Many Chains
+To deploy the DVP contract and the DVP helper contract with code verification, on many chains, follow these steps:
+1. In the `env` file (copy from `.env.template` if this does not exist) maintain values for all the environment variables listed.
+2. See the help for this script to see supported chains:
+```bash
+$ scripts/deploy-multi-chain.sh -h
+```
+3. Run:
+```bash
+./scripts/deploy-multi-chain.sh
+```
+which deploys to all chains supported by the script, or run:
+```bash
+./scripts/deploy-multi-chain.sh -n sepolia arbsepolia
+```
+to deploy just to some of the supported chains.
+
+### Deploying Contracts to Many New Chains
+The list of chains to deploy to in the previous section can be extended by following these steps:
+1. Define the network names to deploy to in `foundry.toml`. You can see the existing network names in `foundry.toml` with their RPC URL under `[rpc_endpoints]` and their verification API key under `[etherscan]`.
+2. Edit `.env` and maintain the environment variables you asked for in `foundry.toml` in step 1.
+3. Edit the deploy script `deploy-multi-chain.sh` in the `.scripts` folder. Change the variable called `NETWORKS` to contain the additional network names you want to deploy to.
 4. Run:
 ```bash
-./scripts/deploy-multi-chain.sh`
+./scripts/deploy-multi-chain.sh -n <new network name>
 ```
+to deploy all contracts with code verification to the new chain.
 
 ## Workflow Summary
 ### Create a Settlement

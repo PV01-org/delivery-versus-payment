@@ -100,14 +100,14 @@ fi
 # Deployment function
 deploy_to_network() {
   local network="$1"
-  echo "Deploying to $network ..."
+  echo "Deploying DVP to $network ..."
   forge script script/DeployDvp.s.sol:Deploy \
     --rpc-url "$network" \
     --broadcast \
     --verify \
     --private-key "$PRIVATE_KEY"
 
-  echo "Deploying DVP Helper to $NET"
+  echo "Deploying DVP Helper to $network"
   forge script script/DeployDvpHelper.s.sol:Deploy \
     --rpc-url "$network" \
     --broadcast \

@@ -142,7 +142,7 @@ contract DVPHandler is Test {
       this.updateTrackingApprovalByParty(settlementId, ethRequired);
 
       // Perhaps the settlement was also executed
-      (,,, bool isSettled, bool isAutoSettled) = dvp.getSettlement(settlementId);
+      (,,,,, bool isSettled, bool isAutoSettled,) = dvp.getSettlement(settlementId);
       if (isSettled && isAutoSettled) {
         this.updateTrackingExecuteSettlement(settlementId, true);
       }
@@ -193,8 +193,17 @@ contract DVPHandler is Test {
 
   /// @dev Calculates ETH required for msg.sender to approve a settlement
   function calculateEthRequiredForMsgSender(uint256 settlementId) external view returns (uint256) {
-    try dvp.getSettlement(settlementId) returns (
-      string memory, uint256, IDeliveryVersusPaymentV1.Flow[] memory flows, bool, bool
+    try dvp.getSettlement(
+      settlementId
+    ) returns (
+      string memory,
+      uint256,
+      IDeliveryVersusPaymentV1.Flow[] memory flows,
+      IDeliveryVersusPaymentV1.Flow[] memory,
+      address,
+      bool,
+      bool,
+      bool
     ) {
       uint256 ethRequired = 0;
       // Sum all ETH amounts this party is sending

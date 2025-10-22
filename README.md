@@ -167,17 +167,17 @@ Sequence diagram for a happy path process though a settlement with auto-settle e
 ## Events
 Topic0 values for events are:
 
-| Event                                                       | Topic0                                                             |
-|-------------------------------------------------------------|--------------------------------------------------------------------|
-| ETHReceived(address,uint256)                                | 0xbfe611b001dfcd411432f7bf0d79b82b4b2ee81511edac123a3403c357fb972a |
-| ETHWithdrawn(address,uint256)                               | 0x94b2de810873337ed265c5f8cf98c9cffefa06b8607f9a2f1fbaebdfbcfbef1c |
-| SettlementApprovalRevoked(uint256,address)                  | 0x96c5a579760c144ad93a5c19d41440d5185ba0451704c0ac7cb22488d8735ac2 |
-| SettlementApproved(uint256,address)                         | 0x7f89b61c53062fb158619c7b66552eabdfb0e1d37c439a62c2d2b5a657bcea93 |
-| SettlementAutoExecutionFailedOther(uint256,address,bytes)   | 0x63c222ac809d589e48426985c6af11739f936b405e0a78a920fbae6565c07497 |
-| SettlementAutoExecutionFailedPanic(uint256,address,uint256) | 0x3c4e728bba5a6c57290cee894ede5970e12dc7d459808344b14cec9a956f1dc2 |
-| SettlementAutoExecutionFailedReason(uint256,address,string) | 0xe1c01819733d746479549271d3a51445514b8f678614d50ad34d305c67b83d9c |
-| SettlementCreated(uint256,address)                          | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
-| SettlementExecuted(uint256,address)                         | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
+| Event                                                        | Topic0                                                             |
+|--------------------------------------------------------------|--------------------------------------------------------------------|
+| ETHReceived(address,uint256)                                 | 0xbfe611b001dfcd411432f7bf0d79b82b4b2ee81511edac123a3403c357fb972a |
+| ETHWithdrawn(address,uint256)                                | 0x94b2de810873337ed265c5f8cf98c9cffefa06b8607f9a2f1fbaebdfbcfbef1c |
+| SettlementApprovalRevoked(uint256,address)                   | 0x96c5a579760c144ad93a5c19d41440d5185ba0451704c0ac7cb22488d8735ac2 |
+| SettlementApproved(uint256,address)                          | 0x7f89b61c53062fb158619c7b66552eabdfb0e1d37c439a62c2d2b5a657bcea93 |
+| SettlementCreated(uint256,address)                           | 0x3c521c92800f95c83d088ee8c520c5b47b3676958e48a985fe1d45d7cf6dbd78 |
+| SettlementExecuted(uint256,address)                          | 0xf059ff22963b773739a912cc5c0f2f358be1a072c66ba18e2c31e503fd012195 |
+| SettlementExecutionFailedOther(uint256,address,bool,bytes)   | 0x2fb0f0e288825d79bc923ab286ce365c1552f8776aa33413af9a35b5ae6028c5 |
+| SettlementExecutionFailedPanic(uint256,address,bool,uint256) | 0xe8371a49f37ebac2050c0e5b70c4ee88e0776c5ba7e3be09e1b9660fefa3528a |
+| SettlementExecutionFailedReason(uint256,address,bool,string) | 0x55e0c9c38879d7b337ccd4db63235e0c504f645e3f925a790a1496ac7d090174 |
 
 ## Linting and pre-commit
 This repository uses pre-commit to run lightweight checks and enforce a standard Solidity code format via Foundry.
